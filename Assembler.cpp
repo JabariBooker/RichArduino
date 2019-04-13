@@ -1,41 +1,5 @@
 #include "Assembler.h"
 
-Assembler::Assembler(){
-   instructions["nop"]   = Instruction(0, NO_OP);
-   instructions["ld"]    = Instruction(1, MEM_IMMED);
-   instructions["ldr"]   = Instruction(2, MEM_REL);
-   instructions["st"]    = Instruction(3, MEM_IMMED);
-   instructions["str"]   = Instruction(4, MEM_REL);
-   instructions["la"]    = Instruction(5, MEM_IMMED);
-   instructions["lar"]   = Instruction(6, MEM_REL);
-   instructions["br"]    = Instruction(8, BR, BR_ALL);
-   instructions["brnv"]  = Instruction(8, BR, BR_ALL);
-   instructions["brzr"]  = Instruction(8, BR, BR_ALL);
-   instructions["brnz"]  = Instruction(8, BR, BR_ALL);
-   instructions["brpl"]  = Instruction(8, BR, BR_ALL);
-   instructions["brmi"]  = Instruction(8, BR, BR_ALL);
-   instructions["brl"]   = Instruction(9, BRL, BR_ALL);
-   instructions["brlzr"] = Instruction(9, BRL, BR_ALL);
-   instructions["brlnv"] = Instruction(9, BRL, BR_ALL);
-   instructions["brlnz"] = Instruction(9, BRL, BR_ALL);
-   instructions["brlpl"] = Instruction(9, BRL, BR_ALL);
-   instructions["brlmi"] = Instruction(9, BRL, BR_ALL);
-   instructions["add"]   = Instruction(12, AASO);
-   instructions["addi"]  = Instruction(13, MEM_IMMED);
-   instructions["sub"]   = Instruction(14, AASO);
-   instructions["neg"]   = Instruction(15, NEG);
-   instructions["and"]   = Instruction(20, AASO);
-   instructions["andi"]  = Instruction(21, MEM_IMMED);
-   instructions["or"]    = Instruction(22, AASO);
-   instructions["ori"]   = Instruction(23, MEM_IMMED);
-   instructions["not"]   = Instruction(24, NEG);
-   instructions["shr"]   = Instruction(26, SHIFT);
-   instructions["shra"]  = Instruction(27, SHIFT);
-   instructions["shl"]   = Instruction(28, SHIFT);
-   instructions["shc"]   = Instruction(29, SHIFT);
-   instructions["stop"]  = Instruction(31, NO_OP);
-}
-
 string Assembler::assemble(string & code, string & message){
    map<string, size_t> labels;
    vector<string> lines;
@@ -72,12 +36,16 @@ string Assembler::assemble(string & code, string & message){
    ss >> org >> codeStart;
 
    //first pass: looking for label positioning
-   size_t instrCounter = 0;
+   size_t instrCounter = 0,
+          codeLine = 1;
    for(size_t i = 0; i < lines.size(); ++i){
       string line = lines[i];
 
       size_t start = line.find_first_not_of(" \t");
-      if(line == "" || start == string::npos) continue;
+      if(line == "" || start == string::npos){
+          ++codeLine;
+          continue;
+      }
 
 	  //Comment detection
 	  size_t commentStart = line.find("//");
@@ -89,6 +57,7 @@ string Assembler::assemble(string & code, string & message){
 		  istringstream iss(line);
           iss >> org >> instrCounter;
           lines[i] = line.substr(start);
+          ++codeLine;
 		  continue;
 	}
 
@@ -96,6 +65,12 @@ string Assembler::assemble(string & code, string & message){
       if(labelEnd != string::npos){
 		
 		string label = line.substr(start, labelEnd - start);
+
+        //checking if label is valid
+        if(!checkLabel(label)){
+            message = "Invalid label at line " + to_string(codeLine) + "!";
+            return "";
+        }
 
 		//support for .equ convention
 		size_t equStart = line.find(".equ");
@@ -115,12 +90,13 @@ string Assembler::assemble(string & code, string & message){
       lines[i] = line.substr(start);
 
       instrCounter += 4;
+      ++codeLine;
    }
 
    //second pass: assembling code
    string machineCode = "";
-   uint32_t lineNum = codeStart,
-            codeLine = 1;
+   uint32_t lineNum = codeStart;
+   codeLine = 1;
       
    for(string line : lines){
       
@@ -165,12 +141,11 @@ string Assembler::assemble(string & code, string & message){
       }
 
       //getting rid of commas
-	  replaceAll(line, ",", " ");
+	   replaceAll(line, ",", " ");
 
-	  istringstream iss(line);
-	  string instr;
-      uint32_t ra, rb, rc, c1, c2, c3;
-
+      //getting instruction/pseudo op
+	   istringstream iss(line);
+	   string instr;
       iss >> instr;
 
 
@@ -210,6 +185,8 @@ string Assembler::assemble(string & code, string & message){
               machineCode.insert(machineCode.size(), hexStream.str() + "\n");
 			  lineNum += 4;
 		  }
+
+          ++codeLine;
 		  continue;
 	  }
       else if (instr == ".dcb") {	//allocate and set 8 bit values
@@ -282,6 +259,8 @@ string Assembler::assemble(string & code, string & message){
       //getting instruction opcode and putting into line
       Instruction in;
       uint32_t binaryLine;
+      string ra, rb, rc, c1, c2, c3;
+
       try{
           in = instructions.at(instr);
           binaryLine = in.opcode;
@@ -311,46 +290,55 @@ string Assembler::assemble(string & code, string & message){
             iss_m >> ra;
 
             if(instr == "ld" || instr == "st" || instr == "la"){
-				if (line.find('(') != string::npos) {
-					string next;
-					iss_m >> next;
+               if (line.find('(') != string::npos) {
+                  string next;
+                  iss_m >> next;
 
-                    size_t rbStart = next.find('('),
-                           rbEnd = next.find(')');
+                  size_t rbStart = next.find('('),
+                        rbEnd = next.find(')');
 
-                    rb = stoul(next.substr(rbStart + 1, rbEnd - rbStart + 1));
+                  rb = next.substr(rbStart + 1, rbEnd - rbStart - 1);
 
-					if (rbStart == 0) c2 = 0;
-                    else c2 = stoul(next.substr(0, rbStart));
-				}
-				else {
-					rb = 0;
-					iss_m >> c2;
-				}
-			}
-			else{
-				iss_m >> rb;
-				iss_m >> c2;
-			}
-
-            if(!checkRegister(ra, rb)){
-                message = "Invalid register at line " + to_string(codeLine) + "!";
-                return "";
+                  if (rbStart == 0) c2 = "0";
+                  else c2 = next.substr(0, rbStart);
+               }
+               else {
+                  rb = "0";
+                  iss_m >> c2;
+               }
+            }
+            else{
+               iss_m >> rb;
+               iss_m >> c2;
             }
 
-            if(!checkConstant(c2, C2)){
-                message = "Invalid c2 constant at line " + to_string(codeLine) + "!";
-                return "";
+            if(!checkStringsNumberic(ra, rb, c2, "0", 0b0010)){
+                  message = "Non-numeric register/constant value at line " + to_string(codeLine) + "!";
+                  return "";
+            }
+            
+            uint32_t raVal = stoul(ra),
+                     rbVal = stoul(rb),
+                     c2Val = stoul(c2);
+
+            if(!checkRegisterVal(raVal, rbVal)){
+                  message = "Invalid register at line " + to_string(codeLine) + "!";
+                  return "";
+            }
+
+            if(!checkConstant(c2Val, C2)){
+                  message = "Invalid c2 constant at line " + to_string(codeLine) + "!";
+                  return "";
             }
 
             binaryLine <<= 5;
-            binaryLine |= (ra & REG_MASK);
+            binaryLine |= (raVal & REG_MASK);
 
             binaryLine <<= 5;
-            binaryLine |= (rb & REG_MASK);
+            binaryLine |= (rbVal & REG_MASK);
 
             binaryLine <<= 17;
-            binaryLine |= (c2 & C2_MASK);
+            binaryLine |= (c2Val & C2_MASK);
          }
 
          //ldr, str, lar
@@ -358,23 +346,31 @@ string Assembler::assemble(string & code, string & message){
             iss_m >> ra;
             iss_m >> c1;
 
-            c1 = c1 - lineNum;
+            if(!checkStringsNumberic(ra, c1, "0", "0", 0b0100)){
+                  message = "Non-numeric register/constant value at line " + to_string(codeLine) + "!";
+                  return "";
+            }
+            
+            uint32_t raVal = stoul(ra),
+                     c1Val = stoul(c1);
 
-            if(!checkRegister(ra)){
+            c1Val -= lineNum;
+
+            if(!checkRegisterVal(raVal)){
                 message = "Invalid register at line " + to_string(codeLine) + "!";
                 return "";
             }
 
-            if(!checkConstant(c1, C1)){
+            if(!checkConstant(c1Val, C1)){
                 message = "Invalid c1 constant at line " + to_string(codeLine) + "!";
                 return "";
             }
 
             binaryLine <<= 5;
-            binaryLine |= (ra & REG_MASK);
+            binaryLine |= (raVal & REG_MASK);
 
             binaryLine <<=22;
-            binaryLine |= (c1 & C1_MASK);
+            binaryLine |= (c1Val & C1_MASK);
          }
          
          //neg, not
@@ -382,18 +378,26 @@ string Assembler::assemble(string & code, string & message){
             iss_m >> ra;
             iss_m >> rc;
 
-            if(!checkRegister(ra, rc)){
+            if(!checkStringsNumberic(ra, rc)){
+                  message = "Non-numeric register/constant value at line " + to_string(codeLine) + "!";
+                  return "";
+            }
+            
+            uint32_t raVal = stoul(ra),
+                     rcVal = stoul(rc);
+
+            if(!checkRegisterVal(raVal, rcVal)){
                 message = "Invalid register at line " + to_string(codeLine) + "!";
                 return "";
             }
 
             binaryLine <<= 5;
-            binaryLine |= (ra & REG_MASK);
+            binaryLine |= (raVal & REG_MASK);
 
             binaryLine <<= 5;   //rbField unused
 
             binaryLine <<= 5;
-            binaryLine |= (rc & REG_MASK);
+            binaryLine |= (rcVal & REG_MASK);
 
             binaryLine <<= 12;
          }
@@ -401,13 +405,13 @@ string Assembler::assemble(string & code, string & message){
          //br, brl
          else if(in.sec_group == BR_ALL){
             uint32_t con = 0;
-            c3 = 0;
+            c3 = "0";
 
             if(in.group == BRL) iss_m >> ra;
-            else ra = 0;
+            else ra = "0";
 
             if(instr == "brnv" || instr == "brlnv"){
-               rb = rc = 0;
+               rb = rc = "0";
             }
             else{
                
@@ -415,7 +419,7 @@ string Assembler::assemble(string & code, string & message){
 
                if(instr == "br" || instr == "brl"){
                   if(!(iss_m >> rc)){
-                     rc = 0;
+                     rc = "0";
                      con = 1;
                   }
                   else{
@@ -433,28 +437,38 @@ string Assembler::assemble(string & code, string & message){
                }
             }
 
-            if(!checkRegister(ra, rb, rc)){
+            if(!checkStringsNumberic(ra, rb, rc, c3, 0b0001)){
+                  message = "Non-numeric register/constant value at line " + to_string(codeLine) + "!";
+                  return "";
+            }
+            
+            uint32_t raVal = stoul(ra),
+                     rbVal = stoul(rb),
+                     rcVal = stoul(rc),
+                     c3Val = stoul(c3);
+
+            if(!checkRegisterVal(raVal, rbVal, rcVal)){
                 message = "Invalid register at line " + to_string(codeLine) + "!";
                 return "";
             }
 
-            if(!checkConstant(c3, C3)){
+            if(!checkConstant(c3Val, C3)){
                 message = "Invalid c3 constant at line " + to_string(codeLine) + "!";
                 return "";
             }
 
             binaryLine <<= 5;
-            binaryLine |= (ra & REG_MASK);
+            binaryLine |= (raVal & REG_MASK);
 
             binaryLine <<= 5;
-            binaryLine |= (rb & REG_MASK);
+            binaryLine |= (rbVal & REG_MASK);
 
             binaryLine <<= 5;
-            binaryLine |= (rc & REG_MASK);
+            binaryLine |= (rcVal & REG_MASK);
 
             binaryLine <<= 12;
 
-            if(con == 0) binaryLine |= (c3 & C3_MASK);
+            if(con == 0) binaryLine |= (c3Val & C3_MASK);
             else binaryLine |= (con & 3);
          }
 
@@ -462,19 +476,28 @@ string Assembler::assemble(string & code, string & message){
          else if(in.group == AASO){
             iss_m >> ra >> rb >> rc;
 
-            if(!checkRegister(ra, rb, rc)){
+            if(!checkStringsNumberic(ra, rb, rc)){
+                  message = "Non-numeric register/constant value at line " + to_string(codeLine) + "!";
+                  return "";
+            }
+            
+            uint32_t raVal = stoul(ra),
+                     rbVal = stoul(rb),
+                     rcVal = stoul(rc);
+
+            if(!checkRegisterVal(raVal, rbVal, rcVal)){
                 message = "Invalid register at line " + to_string(codeLine) + "!";
                 return "";
             }
 
             binaryLine <<= 5;
-            binaryLine |= (ra & REG_MASK);
+            binaryLine |= (raVal & REG_MASK);
 
             binaryLine <<= 5;
-            binaryLine |= (rb & REG_MASK);
+            binaryLine |= (rbVal & REG_MASK);
 
             binaryLine <<= 5;
-            binaryLine |= (rc & REG_MASK);
+            binaryLine |= (rcVal & REG_MASK);
 
             binaryLine <<= 12;
          }
@@ -489,49 +512,60 @@ string Assembler::assemble(string & code, string & message){
       else {
          string regA, regB, lastArg;
 
-         iss >> regA >> regB >> lastArg;
-         regA.replace(0, 1, "");
-         regB.replace(0, 1, "");
+         iss >> ra >> rb >> lastArg;
+         ra.replace(0, 1, "");
+         rb.replace(0, 1, "");
 
          if(lastArg.find("r") == string::npos){
-            ra = stoul(regA);
-            rb = stoul(regB);
-            uint32_t count = stoul(lastArg);
+            
+            if(!checkStringsNumberic(ra, rb, lastArg)){
+                  message = "Non-numeric register or shift count value at line " + to_string(codeLine) + "!";
+                  return "";
+            }
 
-            if(!checkRegister(ra, rb, count)){
+            uint32_t raVal = stoul(ra), 
+                     rbVal = stoul(rb),
+                     count = stoul(lastArg);
+
+            if(!checkRegisterVal(raVal, rbVal, count)){
                 message = "Invalid register or shift count at line " + to_string(codeLine) + "!";
                 return "";
             }
 
             binaryLine <<= 5;
-            binaryLine |= (ra & REG_MASK);
+            binaryLine |= (raVal & REG_MASK);
 
             binaryLine <<= 5;
-            binaryLine |= (rb & REG_MASK);
+            binaryLine |= (rbVal & REG_MASK);
 
             binaryLine <<= 17;
             binaryLine |= (count & REG_MASK);
          }
          else{
             lastArg.replace(0, 1, "");
+            
+            if(!checkStringsNumberic(ra, rb, lastArg)){
+                  message = "Non-numeric register value at line " + to_string(codeLine) + "!";
+                  return "";
+            }
 
-            ra = stoul(regA);
-            rb = stoul(regB);
-            rc = stoul(lastArg);
+            uint32_t raVal = stoul(ra),
+                     rbVal = stoul(rb),
+                     rcVal = stoul(lastArg);
 
-            if(!checkRegister(ra, rb, rc)){
+            if(!checkRegisterVal(raVal, rbVal, rcVal)){
                 message = "Invalid register at line " + to_string(codeLine) + "!";
                 return "";
             }
 
             binaryLine <<= 5;
-            binaryLine |= (ra & REG_MASK);
+            binaryLine |= (raVal & REG_MASK);
 
             binaryLine <<= 5;
-            binaryLine |= (rb & REG_MASK);
+            binaryLine |= (rbVal & REG_MASK);
 
             binaryLine <<= 5;
-            binaryLine |= (rc & REG_MASK);
+            binaryLine |= (rcVal & REG_MASK);
 
             binaryLine <<= 12;
          }
@@ -555,8 +589,46 @@ void Assembler::replaceAll(string &in, string tar, string rep) {
 	}
 }
 
-bool Assembler::checkRegister(uint32_t reg1, uint32_t reg2,  uint32_t reg3){
+bool Assembler::checkRegisterVal(uint32_t reg1, uint32_t reg2,  uint32_t reg3){
     return !(reg1 > 31 || reg2 > 31 || reg3 > 31);
+}
+
+bool Assembler::checkStringsNumberic(string str1, string str2, string str3, string str4, uint8_t constantFlags){
+   bool areValid = true;
+   
+   size_t size1 = str1.size(), size2 = str2.size(), size3 = str3.size(), size4 = str4.size();
+   
+   bool isConst1 = constantFlags & 0b1000,
+        isConst2 = constantFlags & 0b0100,
+        isConst3 = constantFlags & 0b0010,
+        isConst4 = constantFlags & 0b0001;
+
+   size_t maxLength = (size1 > size2) ? size1 : size2;
+   maxLength = (maxLength > size3) ?  maxLength : size3;
+   maxLength = (maxLength > size4) ?  maxLength : size4;
+
+   for(size_t i=0; i < maxLength; ++i){
+      if(i < size1){
+         if(isConst1 && str1.at(i) == '-') areValid &= true;
+         else areValid &= isdigit(str1.at(i));
+      }
+      if(i < size2){
+         if(isConst2 && str2.at(i) == '-') areValid &= true;
+         else areValid &= isdigit(str2.at(i));
+      }
+      if(i < size3){
+         if(isConst3 && str3.at(i) == '-') areValid &= true;
+         else areValid &= isdigit(str3.at(i));
+      }
+      if(i < size4){
+         if(isConst4 && str4.at(i) == '-') areValid &= true;
+         else areValid &= isdigit(str4.at(i));
+      }
+
+      if(!areValid) break;
+   }
+
+   return areValid;
 }
 
 bool Assembler::checkConstant(size_t constVal, CONSTANT_TYPE type){
@@ -568,4 +640,22 @@ bool Assembler::checkConstant(size_t constVal, CONSTANT_TYPE type){
         case C3:
             return constVal < (1 << 12);
     }
+}
+
+bool Assembler::checkLabel(string label){
+    bool isValid = true;
+
+
+    size_t instrSize = instrNames.size(), regSize = registers.size();
+    size_t largerSize = (instrSize > regSize) ? instrSize : regSize;
+
+    for(size_t i = 0; i < largerSize; ++i){
+
+        if(i < instrSize) isValid &= label != instrNames[i];
+        if(i < regSize) isValid &= label != registers[i];
+
+        if(!isValid) break;
+    }
+
+    return isValid;
 }

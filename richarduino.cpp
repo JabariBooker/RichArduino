@@ -2,8 +2,7 @@
 
 RichArduino::RichArduino(QWidget *parent)
     : QWidget(parent),
-    ui(new Ui::RichArduinoClass),
-    assembler(new Assembler)
+    ui(new Ui::RichArduinoClass)
 {
     ui->setupUi(this);
 	
@@ -75,7 +74,7 @@ void RichArduino::on_saveBin_clicked(){
     if (!code.isEmpty()) {
         string text(code.toLatin1().data()),
                message;
-        QString machineCode(assembler->assemble(text, message).c_str());
+        QString machineCode(assembler.assemble(text, message).c_str());
 
         if(machineCode.isEmpty()){
             QString mes(message.c_str());
@@ -131,7 +130,7 @@ void RichArduino::on_upload_clicked() {
         string text(code.toLatin1().data()),
                message;
 
-        QString machineCode(assembler->assemble(text, message).c_str());
+        QString machineCode(assembler.assemble(text, message).c_str());
 
         if(machineCode.isEmpty()){
             QString mes(message.c_str());

@@ -20,8 +20,8 @@ public:
 
 private:
     Ui::RichArduinoClass *ui;
-    Assembler *assembler;
     USB *usb;
+    Assembler assembler;
 
 private slots:
 	void on_fileExplore_clicked();	//select filepath in file explorer
