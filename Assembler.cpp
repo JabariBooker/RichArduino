@@ -36,7 +36,7 @@ Assembler::Assembler(){
    instructions["stop"]  = Instruction(31, NO_OP);
 }
 
-string Assembler::assemble(string code){
+string Assembler::assemble(string & code, string & message){
    map<string, size_t> labels;
    vector<string> lines;
 
@@ -50,17 +50,30 @@ string Assembler::assemble(string code){
    //getting start address of code
    size_t codeStart;
    string org;
-   if(lines[0].find(".org") == string::npos){
-	  qStdOut() << "code doesn't start with \".org\"!" << endl;
-      return NULL;
+
+
+   //looking for first actual line of code
+   string firstCodeLine;
+   for(string line : lines){
+       size_t start = line.find_first_not_of(" \t");
+       if(start == line.find("//") || start == string::npos) continue;
+       else{
+           firstCodeLine = line;
+           break;
+       }
    }
 
-   istringstream ss(line[0]);
+   if(firstCodeLine.find(".org") == string::npos){
+      message = "code doesn't start with \".org\"!";
+      return "";
+   }
+
+   istringstream ss(firstCodeLine);
    ss >> org >> codeStart;
 
    //first pass: looking for label positioning
    size_t instrCounter = 0;
-   for(int i = 0; i < lines.size(); ++i){
+   for(size_t i = 0; i < lines.size(); ++i){
       string line = lines[i];
 
       size_t start = line.find_first_not_of(" \t");
@@ -92,9 +105,10 @@ string Assembler::assemble(string code){
 			iss >> value;
 			labels[label] = value;
 		}
-
-         labels[label] = instrCounter;
-         start = labelEnd + 1;
+        else{
+            labels[label] = instrCounter;
+        }
+        start = labelEnd + 1;
       }
 
       //getting rid of leading spaces and labels to make second pass easier
@@ -105,17 +119,26 @@ string Assembler::assemble(string code){
 
    //second pass: assembling code
    string machineCode = "";
-   uint32_t lineNum = 0;
+   uint32_t lineNum = codeStart,
+            codeLine = 1;
       
    for(string line : lines){
       
       //if the line is empty ignore it
-	  if (line == "" || line.find_first_not_of(" \t") == string::npos) continue;
+      if (line == "" || line.find_first_not_of(" \t") == string::npos){
+          ++codeLine;
+          continue;
+      }
 
 	  //Comment detection
 	  size_t commentStart = line.find("//");
 	  if (commentStart != string::npos) {
 		  line.erase(commentStart);
+          //checking again now if the line is empty
+          if (line == "" || line.find_first_not_of(" \t") == string::npos){
+              ++codeLine;
+              continue;
+          }
 	  }
 
       //searching for labels in current line and replacing them with their value
@@ -137,7 +160,9 @@ string Assembler::assemble(string code){
 			 }
          }
       }
-	  if(label != "") line.replace(labelPos, labelLen, to_string(value));
+      if(label != ""){
+          line.replace(labelPos, labelLen, to_string(value));
+      }
 
       //getting rid of commas
 	  replaceAll(line, ",", " ");
@@ -156,16 +181,25 @@ string Assembler::assemble(string code){
           iss >> address;
 
           if(address < lineNum || address % 4 != 0){
-              qStdOut() << ".org address is not valid. Either violates linear ordering or is not word-aligned." << endl;
-              return NULL;
+              message = ".org address is not valid. Either violates linear ordering or is not word-aligned.";
+              return "";
+          }
+
+          if(address == lineNum){
+              ++codeLine;
+              continue;
           }
 
           while(lineNum < address){
               machineCode.insert(machineCode.size(), "00000000\n");
               lineNum += 4;
           }
+
+          ++codeLine;
+          continue;
 	  }
       else if (instr == ".equ") {	//already handled, ignore
+          ++codeLine;
 		  continue;
 	  }
       else if (instr == ".dc") {		//allocate and set 32-bit values
@@ -173,22 +207,22 @@ string Assembler::assemble(string code){
 		  while (iss >> value) {
 			  stringstream hexStream;
 			  hexStream << setw(8) << setfill('0') << hex << value;
-			  machineCode.insert(machineCode.size(), hexStream.str());
+              machineCode.insert(machineCode.size(), hexStream.str() + "\n");
 			  lineNum += 4;
 		  }
 		  continue;
 	  }
       else if (instr == ".dcb") {	//allocate and set 8 bit values
 		  uint32_t word = 0;
-		  uint8_t value, count = 0;
+          size_t value, count = 0;
 		  while (iss >> value) {
-			  word <<= 8;;
-			  word |= value & 0xff;
+              word <<= 8;
+              word |= value & 0xff;
 			  ++count;
 			  if (count % 4 == 0) {
 				  stringstream hexStream;
 				  hexStream << setw(8) << setfill('0') << hex << word;
-				  machineCode.insert(machineCode.size(), hexStream.str());
+                  machineCode.insert(machineCode.size(), hexStream.str() + "\n");
 				  lineNum += 4;
 				  word = count = 0;
 			  }
@@ -200,11 +234,13 @@ string Assembler::assemble(string code){
 			  machineCode.insert(machineCode.size(), hexStream.str());
 			  lineNum += 4;
 		  }
+
+          ++codeLine;
 		  continue;
 	  }
       else if (instr == ".dch") {	//allocate and set 16 bit values
 		  uint32_t word = 0;
-		  uint16_t value, count = 0;
+          size_t value, count = 0;
 		  while (iss >> value) {
 			  word <<= 16;;
 			  word |= value & 0xffff;
@@ -224,6 +260,8 @@ string Assembler::assemble(string code){
 			  machineCode.insert(machineCode.size(), hexStream.str() + "\n");
 			  lineNum += 4;
 		  }
+
+          ++codeLine;
 		  continue;
       }
       else if (instr == ".dw") {	//allocate 32-bit words
@@ -233,16 +271,25 @@ string Assembler::assemble(string code){
               machineCode.insert(machineCode.size(), "00000000\n");
               lineNum += 4;
           }
+
+          ++codeLine;
+          continue;
 	  }
-
-
 
 
       /**instr doesn't match a psuedo op, meaning check for instructions now**/
 
       //getting instruction opcode and putting into line
-      Instruction in = instructions[instr];
-      uint32_t binaryLine = in.opcode;
+      Instruction in;
+      uint32_t binaryLine;
+      try{
+          in = instructions.at(instr);
+          binaryLine = in.opcode;
+      }catch(exception e){
+          message = "Invalid instruction or psuedo op at line " +
+                  to_string(codeLine) + "!";
+          return "";
+      }
 
 
       /**determining instruction format**/
@@ -268,13 +315,13 @@ string Assembler::assemble(string code){
 					string next;
 					iss_m >> next;
 
-					int rbStart = next.find('(');
-					int rbEnd = next.find(')');
+                    size_t rbStart = next.find('('),
+                           rbEnd = next.find(')');
 
-					rb = stoi(next.substr(rbStart + 1, rbEnd - rbStart + 1));
+                    rb = stoul(next.substr(rbStart + 1, rbEnd - rbStart + 1));
 
 					if (rbStart == 0) c2 = 0;
-					else c2 = stoi(next.substr(0, rbStart));	
+                    else c2 = stoul(next.substr(0, rbStart));
 				}
 				else {
 					rb = 0;
@@ -285,6 +332,16 @@ string Assembler::assemble(string code){
 				iss_m >> rb;
 				iss_m >> c2;
 			}
+
+            if(!checkRegister(ra, rb)){
+                message = "Invalid register at line " + to_string(codeLine) + "!";
+                return "";
+            }
+
+            if(!checkConstant(c2, C2)){
+                message = "Invalid c2 constant at line " + to_string(codeLine) + "!";
+                return "";
+            }
 
             binaryLine <<= 5;
             binaryLine |= (ra & REG_MASK);
@@ -303,8 +360,15 @@ string Assembler::assemble(string code){
 
             c1 = c1 - lineNum;
 
-            bitset<5> raField(ra);
-            bitset<22> c1Field(c1);
+            if(!checkRegister(ra)){
+                message = "Invalid register at line " + to_string(codeLine) + "!";
+                return "";
+            }
+
+            if(!checkConstant(c1, C1)){
+                message = "Invalid c1 constant at line " + to_string(codeLine) + "!";
+                return "";
+            }
 
             binaryLine <<= 5;
             binaryLine |= (ra & REG_MASK);
@@ -318,8 +382,10 @@ string Assembler::assemble(string code){
             iss_m >> ra;
             iss_m >> rc;
 
-            //rbField unused
-            bitset<5> raField(ra), rbField(0), rcField(rc);
+            if(!checkRegister(ra, rc)){
+                message = "Invalid register at line " + to_string(codeLine) + "!";
+                return "";
+            }
 
             binaryLine <<= 5;
             binaryLine |= (ra & REG_MASK);
@@ -335,12 +401,13 @@ string Assembler::assemble(string code){
          //br, brl
          else if(in.sec_group == BR_ALL){
             uint32_t con = 0;
+            c3 = 0;
 
             if(in.group == BRL) iss_m >> ra;
             else ra = 0;
 
             if(instr == "brnv" || instr == "brlnv"){
-               rb = rc = c3 = 0;
+               rb = rc = 0;
             }
             else{
                
@@ -358,7 +425,6 @@ string Assembler::assemble(string code){
                else{
                   
                   iss_m >> rc;
-                  c3 = 0;
 
                   if(instr == "brzr" || instr == "brlzr")      con = 2;
                   else if(instr == "brnz" || instr == "brlnz") con = 3;
@@ -367,9 +433,15 @@ string Assembler::assemble(string code){
                }
             }
 
-            bitset<5> raField(ra), rbField(rb), rcField(rc);
-            bitset<12> c3Field(c3);
-            bitset<3> conbits(con);
+            if(!checkRegister(ra, rb, rc)){
+                message = "Invalid register at line " + to_string(codeLine) + "!";
+                return "";
+            }
+
+            if(!checkConstant(c3, C3)){
+                message = "Invalid c3 constant at line " + to_string(codeLine) + "!";
+                return "";
+            }
 
             binaryLine <<= 5;
             binaryLine |= (ra & REG_MASK);
@@ -389,6 +461,11 @@ string Assembler::assemble(string code){
          //add, sub, and, or
          else if(in.group == AASO){
             iss_m >> ra >> rb >> rc;
+
+            if(!checkRegister(ra, rb, rc)){
+                message = "Invalid register at line " + to_string(codeLine) + "!";
+                return "";
+            }
 
             binaryLine <<= 5;
             binaryLine |= (ra & REG_MASK);
@@ -421,6 +498,11 @@ string Assembler::assemble(string code){
             rb = stoul(regB);
             uint32_t count = stoul(lastArg);
 
+            if(!checkRegister(ra, rb, count)){
+                message = "Invalid register or shift count at line " + to_string(codeLine) + "!";
+                return "";
+            }
+
             binaryLine <<= 5;
             binaryLine |= (ra & REG_MASK);
 
@@ -436,6 +518,11 @@ string Assembler::assemble(string code){
             ra = stoul(regA);
             rb = stoul(regB);
             rc = stoul(lastArg);
+
+            if(!checkRegister(ra, rb, rc)){
+                message = "Invalid register at line " + to_string(codeLine) + "!";
+                return "";
+            }
 
             binaryLine <<= 5;
             binaryLine |= (ra & REG_MASK);
@@ -456,8 +543,8 @@ string Assembler::assemble(string code){
       //adding to machineCode output
       machineCode.insert(machineCode.size(), hexStream.str() + "\n");
       lineNum += 4;
+      ++codeLine;
    }
-
    return machineCode;
 }
 
@@ -466,4 +553,19 @@ void Assembler::replaceAll(string &in, string tar, string rep) {
 	while ((pos = in.find(tar)) != string::npos) {
 		in.replace(pos, tar.length(), rep);
 	}
+}
+
+bool Assembler::checkRegister(uint32_t reg1, uint32_t reg2,  uint32_t reg3){
+    return !(reg1 > 31 || reg2 > 31 || reg3 > 31);
+}
+
+bool Assembler::checkConstant(size_t constVal, CONSTANT_TYPE type){
+    switch(type){
+        case C1:
+            return constVal < (1 << 22);
+        case C2:
+            return constVal < (1 << 17);
+        case C3:
+            return constVal < (1 << 12);
+    }
 }

@@ -7,7 +7,6 @@
 #include <iomanip>
 #include <map>
 #include <vector>
-#include <bitset>
 #include <algorithm>
 #include <cstdint>
 #include <QTextStream>
@@ -35,7 +34,7 @@ struct Instruction{
 class Assembler{
    public:
       Assembler();
-      string assemble(string code);
+      string assemble(string & code, string & message);
    
    private:
       const uint32_t REG_MASK = 0x1F,
@@ -43,23 +42,16 @@ class Assembler{
                      C2_MASK = 0x1FFFF,
                      C3_MASK = 0xFFF;
 
+      enum CONSTANT_TYPE {
+          C1, C2, C3
+      };
+
       map<string, Instruction> instructions;
 	  void replaceAll(string &in, string tar, string rep);
 
-	  /*
-	  void checkRegister(size_t regVal);
-	  void checkInstruction(string instr);
-	  void checkConstant(size_t constVal, CONSTANT_TYPE type);
-	  */
-	  enum CONTANT_TYPE {
-		  C1, C2, C3
-	  };
+      bool checkRegister(uint32_t reg1, uint32_t reg2 = 0,  uint32_t reg3 = 0);
+      bool checkConstant(size_t constVal, CONSTANT_TYPE type);
 
 
-	  QTextStream& qStdOut()
-	  {
-		  static QTextStream ts(stdout);
-		  return ts;
-	  }
 
 };

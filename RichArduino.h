@@ -20,20 +20,15 @@ public:
 
 private:
     Ui::RichArduinoClass *ui;
-	USB *usb;
-
-	QTextStream& qStdOut()
-	{
-		static QTextStream ts(stdout);
-		return ts;
-	}
+    Assembler *assembler;
+    USB *usb;
 
 private slots:
 	void on_fileExplore_clicked();	//select filepath in file explorer
 	void on_reconnect_clicked();	//reconnects to RichArduino
 	void on_open_clicked();			//open specified file
 	void on_saveAsm_clicked();			//save asm code to file
-	//void on_saveBin_clicked();			//save machine code to file
+    void on_saveBin_clicked();			//save machine code to file
 	void on_read_clicked();			//assemble code and show in output
 	void on_upload_clicked();		//sends assembled code over USB
 };

@@ -2,13 +2,17 @@
 
 RichArduino::RichArduino(QWidget *parent)
     : QWidget(parent),
-    ui(new Ui::RichArduinoClass)
+    ui(new Ui::RichArduinoClass),
+    assembler(new Assembler)
 {
     ui->setupUi(this);
 	
-    do {
-		usb = new USB();
-    } while (!usb->initialized());
+    string message;
+
+    usb = new USB(message);
+
+    QString mes(message.c_str());
+    ui->outputField->append(mes);
 }
 
 RichArduino::~RichArduino() {
@@ -18,9 +22,13 @@ RichArduino::~RichArduino() {
 
 void RichArduino::on_reconnect_clicked() {
     if(usb != nullptr) delete usb;
-    do {
-		usb = new USB();
-    } while (!usb->initialized());
+
+    string message;
+
+    usb = new USB(message);
+
+    QString mes(message.c_str());
+    ui->outputField->append(mes);
 }
 
 void RichArduino::on_fileExplore_clicked() {
@@ -41,6 +49,9 @@ void RichArduino::on_open_clicked() {
 			QString asmCode(asmFile.readAll());
             ui->programField->setText(asmCode);
 		}
+        else{
+            ui->outputField->append("Failed to open: " + filePath);
+        }
 	}
 }
 
@@ -53,18 +64,50 @@ void RichArduino::on_saveAsm_clicked() {
 		if (outFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
 			QTextStream out(&outFile);
             out << (ui->programField->toPlainText());
+            ui->outputField->append("Saved assembly code to: " + filePath);
 		}
 		
 	}
+}
+
+void RichArduino::on_saveBin_clicked(){
+    QString code = ui->programField->toPlainText();
+    if (!code.isEmpty()) {
+        string text(code.toLatin1().data()),
+               message;
+        QString machineCode(assembler->assemble(text, message).c_str());
+
+        if(machineCode.isEmpty()){
+            QString mes(message.c_str());
+            ui->outputField->append(mes);
+            return;
+        }
+
+        QString filePath = QFileDialog::getSaveFileName(this, tr("Save bin file"), "", tr("bin file (*.bin)"));
+        if(!filePath.isEmpty()){
+            QFile outFile(filePath);
+
+            if (outFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
+                QTextStream out(&outFile);
+                out << machineCode;
+                 ui->outputField->append("Saved machine code to: " + filePath);
+            }
+        }
+    }
 }
 
 void RichArduino::on_read_clicked() {
 	readPt in = nullptr;
 	int bytes;
 
-	usb->read(in, bytes);
+    string message;
 
-	if (!in) {
+    bool success = usb->read(in, bytes, message);
+
+    QString mes(message.c_str());
+    ui->outputField->append(mes);
+
+    if (success) {
 		if (bytes != -1) {
 			uint8_t* data = (uint8_t*)in;
 
@@ -76,19 +119,25 @@ void RichArduino::on_read_clicked() {
 				output.append(end);
 			}
 
-            ui->outputField->setText(output);
+            ui->outputField->append(output);
 		}
 		delete[] in;
 	}
 }
 
 void RichArduino::on_upload_clicked() {
-	Assembler assembler;
-
     QString code = ui->programField->toPlainText();
 	if (!code.isEmpty()) {
-		std::string text(code.toLatin1().data());
-		QString machineCode(assembler.assemble(text).c_str());
+        string text(code.toLatin1().data()),
+               message;
+
+        QString machineCode(assembler->assemble(text, message).c_str());
+
+        if(machineCode.isEmpty()){
+            QString mes(message.c_str());
+            ui->outputField->append(mes);
+            return;
+        }
 
 		QVector<QString> machineWords = machineCode.split('\n').toVector();
 
@@ -102,13 +151,12 @@ void RichArduino::on_upload_clicked() {
 			uint32_t instr = machineWords.at(i).toULong(nullptr, 16);
 
 			machineCodeData[i] = instr;
-		}
+        }
 
-		for (int i = 0; i < /*30*/numWords + 1; ++i) {
-			cout << setw(8) << setfill('0') << hex << machineCodeData[i] << endl;
-		}
+        usb->send(machineCodeData, sizeof(uint32_t) * (numWords + 1), message);
 
-		usb->send(machineCodeData, sizeof(uint32_t) * (numWords + 1));
+        QString mes(message.c_str());
+        ui->outputField->append(mes);
 
 		delete[] machineCodeData;
 	}

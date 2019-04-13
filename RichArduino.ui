@@ -10,6 +10,12 @@
     <height>647</height>
    </rect>
   </property>
+  <property name="minimumSize">
+   <size>
+    <width>617</width>
+    <height>647</height>
+   </size>
+  </property>
   <property name="windowTitle">
    <string>RichArduino</string>
   </property>
@@ -21,6 +27,9 @@
      <width>75</width>
      <height>23</height>
     </rect>
+   </property>
+   <property name="toolTip">
+    <string>Upload assembled code to RichArduino</string>
    </property>
    <property name="text">
     <string>Upload</string>
@@ -35,6 +44,9 @@
      <height>23</height>
     </rect>
    </property>
+   <property name="toolTip">
+    <string>Open file at the current file path</string>
+   </property>
    <property name="text">
     <string>Open</string>
    </property>
@@ -47,6 +59,9 @@
      <width>71</width>
      <height>23</height>
     </rect>
+   </property>
+   <property name="toolTip">
+    <string>Save current assembly code to .asm</string>
    </property>
    <property name="text">
     <string>Save .asm</string>
@@ -61,6 +76,9 @@
      <height>23</height>
     </rect>
    </property>
+   <property name="toolTip">
+    <string>Read in data from RichArduino</string>
+   </property>
    <property name="text">
     <string>Read</string>
    </property>
@@ -73,6 +91,9 @@
      <width>31</width>
      <height>23</height>
     </rect>
+   </property>
+   <property name="toolTip">
+    <string>Browse system for .asm file</string>
    </property>
    <property name="text">
     <string>...</string>
@@ -87,6 +108,12 @@
      <height>21</height>
     </rect>
    </property>
+   <property name="cursor">
+    <cursorShape>ArrowCursor</cursorShape>
+   </property>
+   <property name="placeholderText">
+    <string>&lt;path-to-assembly-code&gt;/&lt;fileName&gt;.asm </string>
+   </property>
   </widget>
   <widget class="QTextEdit" name="programField">
    <property name="geometry">
@@ -96,6 +123,11 @@
      <width>521</width>
      <height>461</height>
     </rect>
+   </property>
+   <property name="font">
+    <font>
+     <family>Courier</family>
+    </font>
    </property>
   </widget>
   <widget class="QLabel" name="programFieldLabel">
@@ -156,6 +188,9 @@
      <height>23</height>
     </rect>
    </property>
+   <property name="toolTip">
+    <string>Reconnect GUI to RichArduino after disconnecting</string>
+   </property>
    <property name="text">
     <string>Reconnect</string>
    </property>
@@ -169,14 +204,15 @@
      <height>23</height>
     </rect>
    </property>
+   <property name="toolTip">
+    <string>Save currently assembly code to binary in .bin</string>
+   </property>
    <property name="text">
     <string>Save .bin</string>
    </property>
   </widget>
  </widget>
  <layoutdefault spacing="6" margin="11"/>
- <resources>
-  <include location="richarduino.qrc"/>
- </resources>
+ <resources/>
  <connections/>
 </ui>

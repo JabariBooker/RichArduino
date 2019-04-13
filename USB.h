@@ -1,14 +1,11 @@
 #pragma once
 
 #define FTD2XX_STATIC
-//#define FTD2XX_EXPORTS
-
 
 #include <iostream>
 #include <string>
 #include "FTDI/ftd2xx.h"
 #include <cstdint>
-#include <QTextStream>
 
 using namespace std;
 
@@ -16,11 +13,11 @@ typedef void* readPt;
 
 class USB{
    public:
-      USB();
+      USB(string & message);
       ~USB();
-      void send(void* data, size_t size);
+      void send(void* data, size_t size, string & message);
 
-	  void read(readPt data, int & size);
+      bool read(readPt data, int & size, string & message);
 
 	  bool initialized() { return boardFound;  }
 
@@ -30,15 +27,8 @@ class USB{
       FT_HANDLE handle;
       DWORD numDevs;
 
-      bool boardFound = false,
-           devInfoAlloc = false;
+      bool boardFound = false;
 
       const string FT201XQ = "FT201X USB I2C";
       const DWORD txBufferSize = 512, rxBufferSize = 512;
-
-	  QTextStream& qStdOut()
-	  {
-		  static QTextStream ts(stdout);
-		  return ts;
-	  }
 };
