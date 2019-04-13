@@ -63,18 +63,19 @@ string Assembler::assemble(string code){
    for(int i = 0; i < lines.size(); ++i){
       string line = lines[i];
 
+      size_t start = line.find_first_not_of(" \t");
+      if(line == "" || start == string::npos) continue;
+
 	  //Comment detection
 	  size_t commentStart = line.find("//");
 	  if (commentStart != string::npos) {
 		  line.erase(commentStart);
 	  }
 
-      size_t start = line.find_first_not_of(" \t");
-      if(line == "" || start == string::npos) continue;
-
 	  if (line.find(".org") != string::npos){
 		  istringstream iss(line);
-		  iss >> org >> instrCounter;
+          iss >> org >> instrCounter;
+          lines[i] = line.substr(start);
 		  continue;
 	}
 
@@ -104,7 +105,7 @@ string Assembler::assemble(string code){
 
    //second pass: assembling code
    string machineCode = "";
-   size_t lineNum = codeStart;
+   uint32_t lineNum = 0;
       
    for(string line : lines){
       
@@ -143,17 +144,31 @@ string Assembler::assemble(string code){
 
 	  istringstream iss(line);
 	  string instr;
-	  size_t ra, rb, rc, c1, c2, c3;
+      uint32_t ra, rb, rc, c1, c2, c3;
 
-	  /**Support for RSRC Assembly Language Conventions**/
-	  /*
-	  if (line.find(".org") != string::npos) {	//(not supported)
-			  continue;
+      iss >> instr;
+
+
+      /**Support for RSRC Assembly Psuedo Operations**/
+
+      if (instr == ".org") {    //describes where the next instruction will be stored
+          uint32_t address;
+          iss >> address;
+
+          if(address < lineNum || address % 4 != 0){
+              qStdOut() << ".org address is not valid. Either violates linear ordering or is not word-aligned." << endl;
+              return NULL;
+          }
+
+          while(lineNum < address){
+              machineCode.insert(machineCode.size(), "00000000\n");
+              lineNum += 4;
+          }
 	  }
-	  else if (line.find(".equ") != string::npos) {	//already handled, ignore
+      else if (instr == ".equ") {	//already handled, ignore
 		  continue;
 	  }
-	  else if (line.find(".dc") != string::npos) {		//allocate and set 32-bit values
+      else if (instr == ".dc") {		//allocate and set 32-bit values
 		  uint32_t value;
 		  while (iss >> value) {
 			  stringstream hexStream;
@@ -163,7 +178,7 @@ string Assembler::assemble(string code){
 		  }
 		  continue;
 	  }
-	  else if (line.find(".dcb") != string::npos) {	//allocate and set 8 bit values
+      else if (instr == ".dcb") {	//allocate and set 8 bit values
 		  uint32_t word = 0;
 		  uint8_t value, count = 0;
 		  while (iss >> value) {
@@ -187,7 +202,7 @@ string Assembler::assemble(string code){
 		  }
 		  continue;
 	  }
-	  else if (line.find(".dch") != string::npos) {	//allocate and set 16 bit values
+      else if (instr == ".dch") {	//allocate and set 16 bit values
 		  uint32_t word = 0;
 		  uint16_t value, count = 0;
 		  while (iss >> value) {
@@ -210,29 +225,31 @@ string Assembler::assemble(string code){
 			  lineNum += 4;
 		  }
 		  continue;
+      }
+      else if (instr == ".dw") {	//allocate 32-bit words
+          size_t count;
+          iss >> count;
+          for(size_t i=0; i<count; ++i){
+              machineCode.insert(machineCode.size(), "00000000\n");
+              lineNum += 4;
+          }
 	  }
-	  else if (line.find(".db") != string::npos) {	//allocate bytes (not supported)
-		  continue;
-	  }
-	  else if (line.find(".dh") != string::npos) {	//allocate 16-bit halfwords (not supported)
-		  continue;
-	  }
-	  else if (line.find(".dw") != string::npos) {	//allocate 32-bit words
 
-	  }
-	  */
+
+
+
+      /**instr doesn't match a psuedo op, meaning check for instructions now**/
 
       //getting instruction opcode and putting into line
-      iss >> instr;
-      bitset<5> opcode(instructions[instr].opcode);
-      string binaryLine = opcode.to_string();
+      Instruction in = instructions[instr];
+      uint32_t binaryLine = in.opcode;
 
 
       /**determining instruction format**/
 
 
       //checking if instr is a shift instruction
-      if(instructions[instr].group != SHIFT){
+      if(in.group != SHIFT){
          
          //can remove r's from register names to get register numbers
 		 replaceAll(line, "r", "");
@@ -243,7 +260,7 @@ string Assembler::assemble(string code){
          iss_m >> toss;       //prevent duplicate fetch of instruction
 
          //ld, st, la, addi, andi, ori
-         if(instructions[instr].group == MEM_IMMED){
+         if(in.group == MEM_IMMED){
             iss_m >> ra;
 
             if(instr == "ld" || instr == "st" || instr == "la"){
@@ -269,16 +286,18 @@ string Assembler::assemble(string code){
 				iss_m >> c2;
 			}
 
-            bitset<5> raField(ra), rbField(rb);
-            bitset<17> c2Field(c2);
+            binaryLine <<= 5;
+            binaryLine |= (ra & REG_MASK);
 
-            binaryLine.insert(binaryLine.size(), raField.to_string());
-            binaryLine.insert(binaryLine.size(), rbField.to_string());
-            binaryLine.insert(binaryLine.size(), c2Field.to_string());
+            binaryLine <<= 5;
+            binaryLine |= (rb & REG_MASK);
+
+            binaryLine <<= 17;
+            binaryLine |= (c2 & C2_MASK);
          }
 
          //ldr, str, lar
-         else if(instructions[instr].group == MEM_REL){
+         else if(in.group == MEM_REL){
             iss_m >> ra;
             iss_m >> c1;
 
@@ -287,33 +306,41 @@ string Assembler::assemble(string code){
             bitset<5> raField(ra);
             bitset<22> c1Field(c1);
 
-            binaryLine.insert(binaryLine.size(), raField.to_string());
-            binaryLine.insert(binaryLine.size(), c1Field.to_string());
+            binaryLine <<= 5;
+            binaryLine |= (ra & REG_MASK);
+
+            binaryLine <<=22;
+            binaryLine |= (c1 & C1_MASK);
          }
          
          //neg, not
-         else if(instructions[instr].group == NEG){
+         else if(in.group == NEG){
             iss_m >> ra;
             iss_m >> rc;
 
             //rbField unused
             bitset<5> raField(ra), rbField(0), rcField(rc);
 
-            binaryLine.insert(binaryLine.size(), raField.to_string());
-            binaryLine.insert(binaryLine.size(), rbField.to_string());
-            binaryLine.insert(binaryLine.size(), rcField.to_string());
-            binaryLine.insert(binaryLine.size(), "000000000000");
+            binaryLine <<= 5;
+            binaryLine |= (ra & REG_MASK);
+
+            binaryLine <<= 5;   //rbField unused
+
+            binaryLine <<= 5;
+            binaryLine |= (rc & REG_MASK);
+
+            binaryLine <<= 12;
          }
          
          //br, brl
-         else if(instructions[instr].sec_group == BR_ALL){
-            int con = -1;
+         else if(in.sec_group == BR_ALL){
+            uint32_t con = 0;
 
-            if(instructions[instr].group == BRL) iss_m >> ra;
+            if(in.group == BRL) iss_m >> ra;
             else ra = 0;
 
             if(instr == "brnv" || instr == "brlnv"){
-               rb = rc = c3 = con = 0;
+               rb = rc = c3 = 0;
             }
             else{
                
@@ -344,36 +371,40 @@ string Assembler::assemble(string code){
             bitset<12> c3Field(c3);
             bitset<3> conbits(con);
 
-            if(con == -1){
-               binaryLine.insert(binaryLine.size(), raField.to_string());
-               binaryLine.insert(binaryLine.size(), rbField.to_string());
-               binaryLine.insert(binaryLine.size(), rcField.to_string());
-               binaryLine.insert(binaryLine.size(), c3Field.to_string());
-            }
-            else{
-               binaryLine.insert(binaryLine.size(), raField.to_string());
-               binaryLine.insert(binaryLine.size(), rbField.to_string());
-               binaryLine.insert(binaryLine.size(), rcField.to_string());
-               binaryLine.insert(binaryLine.size(), "000000000");
-               binaryLine.insert(binaryLine.size(), conbits.to_string());
-            }
+            binaryLine <<= 5;
+            binaryLine |= (ra & REG_MASK);
+
+            binaryLine <<= 5;
+            binaryLine |= (rb & REG_MASK);
+
+            binaryLine <<= 5;
+            binaryLine |= (rc & REG_MASK);
+
+            binaryLine <<= 12;
+
+            if(con == 0) binaryLine |= (c3 & C3_MASK);
+            else binaryLine |= (con & 3);
          }
 
          //add, sub, and, or
-         else if(instructions[instr].group == AASO){
+         else if(in.group == AASO){
             iss_m >> ra >> rb >> rc;
 
-            bitset<5> raField(ra), rbField(rb), rcField(rc);
+            binaryLine <<= 5;
+            binaryLine |= (ra & REG_MASK);
 
-            binaryLine.insert(binaryLine.size(), raField.to_string());
-            binaryLine.insert(binaryLine.size(), rbField.to_string());
-            binaryLine.insert(binaryLine.size(), rcField.to_string());
-            binaryLine.insert(binaryLine.size(), "000000000000");
+            binaryLine <<= 5;
+            binaryLine |= (rb & REG_MASK);
+
+            binaryLine <<= 5;
+            binaryLine |= (rc & REG_MASK);
+
+            binaryLine <<= 12;
          }
          
          //nop, stop
          else{
-            binaryLine.insert(binaryLine.size(), "000000000000000000000000000");
+            binaryLine <<= 27;
          }
       }
 
@@ -386,28 +417,41 @@ string Assembler::assemble(string code){
          regB.replace(0, 1, "");
 
          if(lastArg.find("r") == string::npos){
-            bitset<5> raField(stoi(regA)), rbField(stoi(regB)), count(stoi(lastArg));
+            ra = stoul(regA);
+            rb = stoul(regB);
+            uint32_t count = stoul(lastArg);
 
-            binaryLine.insert(binaryLine.size(), raField.to_string());
-            binaryLine.insert(binaryLine.size(), rbField.to_string());
-            binaryLine.insert(binaryLine.size(), "000000000000");
-            binaryLine.insert(binaryLine.size(), count.to_string());
+            binaryLine <<= 5;
+            binaryLine |= (ra & REG_MASK);
+
+            binaryLine <<= 5;
+            binaryLine |= (rb & REG_MASK);
+
+            binaryLine <<= 17;
+            binaryLine |= (count & REG_MASK);
          }
          else{
             lastArg.replace(0, 1, "");
 
-            bitset<5> raField(stoi(regA)), rbField(stoi(regB)), rcField(stoi(lastArg));
+            ra = stoul(regA);
+            rb = stoul(regB);
+            rc = stoul(lastArg);
 
-            binaryLine.insert(binaryLine.size(), raField.to_string());
-            binaryLine.insert(binaryLine.size(), rbField.to_string());
-            binaryLine.insert(binaryLine.size(), rcField.to_string());
-            binaryLine.insert(binaryLine.size(), "000000000000");
+            binaryLine <<= 5;
+            binaryLine |= (ra & REG_MASK);
+
+            binaryLine <<= 5;
+            binaryLine |= (rb & REG_MASK);
+
+            binaryLine <<= 5;
+            binaryLine |= (rc & REG_MASK);
+
+            binaryLine <<= 12;
          }
       }
-      
-      unsigned long lineVal = stoul(binaryLine, nullptr, 2);
+
       stringstream hexStream;
-      hexStream << setw(8) << setfill('0') << hex << lineVal;
+      hexStream << setw(8) << setfill('0') << hex << binaryLine;
 
       //adding to machineCode output
       machineCode.insert(machineCode.size(), hexStream.str() + "\n");

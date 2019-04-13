@@ -19,13 +19,13 @@ enum InstructionGroup{
 };
 
 struct Instruction{
-   unsigned char opcode;
+   uint8_t opcode;
    InstructionGroup group, sec_group;
    Instruction() {
 	  opcode = 0;
       group = sec_group = NONE;
    }
-   Instruction(unsigned char op, InstructionGroup grp, InstructionGroup sec_grp = NONE){
+   Instruction(uint8_t op, InstructionGroup grp, InstructionGroup sec_grp = NONE){
       opcode = op;
       group = grp;
       sec_group = sec_grp;
@@ -38,6 +38,11 @@ class Assembler{
       string assemble(string code);
    
    private:
+      const uint32_t REG_MASK = 0x1F,
+                     C1_MASK = 0x3FFFFF,
+                     C2_MASK = 0x1FFFF,
+                     C3_MASK = 0xFFF;
+
       map<string, Instruction> instructions;
 	  void replaceAll(string &in, string tar, string rep);
 
