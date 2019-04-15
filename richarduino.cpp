@@ -27,6 +27,7 @@ void RichArduino::on_reconnect_clicked() {
 
     QString mes(message.c_str());
     ui->outputField->textCursor().insertHtml(mes);
+    ui->outputField->ensureCursorVisible();
 }
 
 void RichArduino::on_fileExplore_clicked() {
@@ -50,6 +51,7 @@ void RichArduino::on_open_clicked() {
         else{
             QString message = qMesError + "Failed to open: " + filePath + qMesEnd;
             ui->outputField->textCursor().insertHtml(message);
+            ui->outputField->ensureCursorVisible();
         }
 	}
 }
@@ -65,6 +67,7 @@ void RichArduino::on_saveAsm_clicked() {
             out << (ui->programField->toPlainText());
             QString message = qMesSuccess + "Saved assembly code to: " + filePath + qMesEnd;
             ui->outputField->textCursor().insertHtml(message);
+            ui->outputField->ensureCursorVisible();
 		}
 		
 	}
@@ -80,6 +83,7 @@ void RichArduino::on_saveBin_clicked(){
         if(machineCode == "failed"){
             QString mes(message.c_str());
             ui->outputField->textCursor().insertHtml(mes);
+            ui->outputField->ensureCursorVisible();
             return;
         }
 
@@ -92,6 +96,7 @@ void RichArduino::on_saveBin_clicked(){
                 out << machineCode;
                 QString message = qMesSuccess + "Saved machine code to: " + filePath + qMesEnd;
                 ui->outputField->textCursor().insertHtml(message);
+                ui->outputField->ensureCursorVisible();
             }
         }
     }
@@ -122,6 +127,7 @@ void RichArduino::on_read_clicked() {
 
             output = qMesNormal + output + qMesEnd;
             ui->outputField->textCursor().insertHtml(output);
+            ui->outputField->ensureCursorVisible();
 		}
 		delete[] in;
 	}
@@ -138,6 +144,7 @@ void RichArduino::on_upload_clicked() {
         if(machineCode == "failed"){
             QString mes(message.c_str());
             ui->outputField->textCursor().insertHtml(mes);
+            ui->outputField->ensureCursorVisible();
             return;
         }
 
@@ -159,6 +166,7 @@ void RichArduino::on_upload_clicked() {
 
         QString mes(message.c_str());
         ui->outputField->textCursor().insertHtml(mes);
+        ui->outputField->ensureCursorVisible();
 
 		delete[] machineCodeData;
 	}

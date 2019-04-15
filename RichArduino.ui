@@ -160,8 +160,19 @@
      <height>81</height>
     </rect>
    </property>
+   <property name="font">
+    <font>
+     <family>Courier</family>
+    </font>
+   </property>
+   <property name="horizontalScrollBarPolicy">
+    <enum>Qt::ScrollBarAlwaysOff</enum>
+   </property>
    <property name="readOnly">
     <bool>true</bool>
+   </property>
+   <property name="acceptRichText">
+    <bool>false</bool>
    </property>
   </widget>
   <widget class="QLabel" name="outputFieldLabel">
