@@ -5,13 +5,12 @@ RichArduino::RichArduino(QWidget *parent)
     ui(new Ui::RichArduinoClass)
 {
     ui->setupUi(this);
-	
-    string message;
 
+    string message;
     usb = new USB(message);
 
     QString mes(message.c_str());
-    ui->outputField->append(mes);
+    ui->outputField->textCursor().insertHtml(mes);
 }
 
 RichArduino::~RichArduino() {
@@ -27,7 +26,7 @@ void RichArduino::on_reconnect_clicked() {
     usb = new USB(message);
 
     QString mes(message.c_str());
-    ui->outputField->append(mes);
+    ui->outputField->textCursor().insertHtml(mes);
 }
 
 void RichArduino::on_fileExplore_clicked() {
@@ -49,7 +48,8 @@ void RichArduino::on_open_clicked() {
             ui->programField->setText(asmCode);
 		}
         else{
-            ui->outputField->append("Failed to open: " + filePath);
+            QString message = qMesError + "Failed to open: " + filePath + qMesEnd;
+            ui->outputField->textCursor().insertHtml(message);
         }
 	}
 }
@@ -63,7 +63,8 @@ void RichArduino::on_saveAsm_clicked() {
 		if (outFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
 			QTextStream out(&outFile);
             out << (ui->programField->toPlainText());
-            ui->outputField->append("Saved assembly code to: " + filePath);
+            QString message = qMesSuccess + "Saved assembly code to: " + filePath + qMesEnd;
+            ui->outputField->textCursor().insertHtml(message);
 		}
 		
 	}
@@ -76,9 +77,9 @@ void RichArduino::on_saveBin_clicked(){
                message;
         QString machineCode(assembler.assemble(text, message).c_str());
 
-        if(machineCode.isEmpty()){
+        if(machineCode == "failed"){
             QString mes(message.c_str());
-            ui->outputField->append(mes);
+            ui->outputField->textCursor().insertHtml(mes);
             return;
         }
 
@@ -89,7 +90,8 @@ void RichArduino::on_saveBin_clicked(){
             if (outFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
                 QTextStream out(&outFile);
                 out << machineCode;
-                 ui->outputField->append("Saved machine code to: " + filePath);
+                QString message = qMesSuccess + "Saved machine code to: " + filePath + qMesEnd;
+                ui->outputField->textCursor().insertHtml(message);
             }
         }
     }
@@ -104,7 +106,7 @@ void RichArduino::on_read_clicked() {
     bool success = usb->read(in, bytes, message);
 
     QString mes(message.c_str());
-    ui->outputField->append(mes);
+    ui->outputField->textCursor().insertHtml(mes);
 
     if (success) {
 		if (bytes != -1) {
@@ -116,9 +118,10 @@ void RichArduino::on_read_clicked() {
 				output.append(QString::number(*(data + i), 16));
 				QString end = (i % 4 == 0) ? "\n" : " ";
 				output.append(end);
-			}
+            }
 
-            ui->outputField->append(output);
+            output = qMesNormal + output + qMesEnd;
+            ui->outputField->textCursor().insertHtml(output);
 		}
 		delete[] in;
 	}
@@ -132,21 +135,21 @@ void RichArduino::on_upload_clicked() {
 
         QString machineCode(assembler.assemble(text, message).c_str());
 
-        if(machineCode.isEmpty()){
+        if(machineCode == "failed"){
             QString mes(message.c_str());
-            ui->outputField->append(mes);
+            ui->outputField->textCursor().insertHtml(mes);
             return;
         }
 
 		QVector<QString> machineWords = machineCode.split('\n').toVector();
 
-		size_t numWords = machineWords.size() - 2;	//top instruction all 0's and last element will be an empty string
+        int numWords = machineWords.size() - 2;	//top instruction all 0's and last element will be an empty string
 
 		uint32_t *machineCodeData = new uint32_t[numWords + 1];
 
-		machineCodeData[0] = numWords;
+        machineCodeData[0] = numWords;
 		
-		for (int i = 1; i < numWords + 1; ++i) {
+        for (int i = 1; i < numWords + 1; ++i) {
 			uint32_t instr = machineWords.at(i).toULong(nullptr, 16);
 
 			machineCodeData[i] = instr;
@@ -155,7 +158,7 @@ void RichArduino::on_upload_clicked() {
         usb->send(machineCodeData, sizeof(uint32_t) * (numWords + 1), message);
 
         QString mes(message.c_str());
-        ui->outputField->append(mes);
+        ui->outputField->textCursor().insertHtml(mes);
 
 		delete[] machineCodeData;
 	}

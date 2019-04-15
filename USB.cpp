@@ -14,8 +14,8 @@ USB::USB(string & message){
 
       ftStatus = FT_GetDeviceInfoList(devInfo, &numDevs);
       if(ftStatus != FT_OK){
-         message = "Could not fetch info for FTDI devices!";
-		 return;
+         message = mesAlert + "Could not fetch info for FTDI devices!" + mesEnd;
+         return;
       }
 
       unsigned int index;
@@ -29,20 +29,20 @@ USB::USB(string & message){
       }
 
       if(!boardFound){
-         message = "Could not find FT201XQ!";
+         message = mesAlert + "Could not find FT201XQ!" + mesEnd;
          return;
       }
 
       ftStatus = FT_Open(index, &handle);
       if(ftStatus != FT_OK){
-         message = "Could not gain access to FT201XQ!";
+         message = mesAlert + "Could not create handle for FT201XQ!" + mesEnd;
          return;
       }
 
-      message = "Connected to RichArduino!";
+      message = mesSuccess + "Connected to RichArduino!" + mesEnd;
    }
    else {
-       message = "Could not find RichArduino!";
+      message = mesAlert + "Could not find RichArduino!" + mesEnd;
    }
 }
 
@@ -54,7 +54,7 @@ USB::~USB(){
 void USB::send(void* data, size_t size, string & message){
    
     if (!boardFound) {
-        message = "Cannot find RichArduino!";
+        message = mesAlert + "Cannot find RichArduino!" + mesEnd;
 		return;
 	}
 
@@ -70,7 +70,7 @@ void USB::send(void* data, size_t size, string & message){
 	while(curr != end){
 		ftStatus = FT_GetStatus(handle, &rxBufferAmount, &txBufferAmount, &eventStatus);
 		if(ftStatus != FT_OK){
-            message = "Unable to check status of FT201XQ!";
+            message = mesAlert + "Unable to check status of FT201XQ!" + mesEnd;
 			return;
 		}
       
@@ -80,23 +80,23 @@ void USB::send(void* data, size_t size, string & message){
 			bytesToWrite = size;
 		}
 		else if(bytesToWrite > end - curr){
-			bytesToWrite = end - curr;
+            bytesToWrite = end - curr;
 		}
 
         ftStatus = FT_Write(handle, curr, bytesToWrite, &bytesWritten);
 		if(ftStatus != FT_OK){
-            message = "Failed to write data!";
+            message = mesAlert + "Failed to write data!" + mesEnd;
             return;
 		}
 		else if(bytesWritten != bytesToWrite){
-            message = "Failed to write all data to USB!";
+            message = mesAlert + "Failed to write all data to USB!" + mesEnd;
 			return;
 		}
 
 		curr += bytesWritten;
 	}
 
-    message = "Wrote to USB";
+    message = mesSuccess + "Wrote to USB" + mesEnd;
 }
 
 bool USB::read(readPt data, int & size, string & message) {
@@ -112,7 +112,7 @@ bool USB::read(readPt data, int & size, string & message) {
 
 	ftStatus = FT_GetStatus(handle, &rxBufferAmount, &txBufferAmount, &eventStatus);
 	if (ftStatus != FT_OK) {
-        message = "Unable to check status of FT201XQ!";
+        message = mesAlert + "Unable to check status of FT201XQ!" + mesEnd;
         return false;
 	}
 
@@ -122,17 +122,17 @@ bool USB::read(readPt data, int & size, string & message) {
 
 	ftStatus = FT_Read(handle, data, rxBufferAmount, &bytesRead);
 	if (ftStatus != FT_OK) {
-        message = "Unable to read from USB!";
+        message = mesAlert + "Unable to read from USB!" + mesEnd;
         delete[] data;
         return false;
 	}
 	if (bytesRead != rxBufferAmount) {
-        message = "Did not read all data from USB!";
+        message = mesAlert + "Did not read all data from USB!" + mesEnd;
         delete[] data;
         return false;
 	}
 
-    message = "Read from RichArduino";
+    message = mesSuccess + "Read from RichArduino" + mesEnd;
 	size = bytesRead;
 
     return true;

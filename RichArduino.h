@@ -8,6 +8,7 @@
 #include <cstdint>
 #include "Assembler.h"
 #include "USB.h"
+#include "MessageFormats.h"
 #include "ui_RichArduino.h"
 
 class RichArduino : public QWidget

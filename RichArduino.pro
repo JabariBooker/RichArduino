@@ -35,6 +35,7 @@ HEADERS += \
     Assembler.h \
     USB.h \
     RichArduino.h \
+    MessageFormats.h \
     FTDI/ftd2xx.h
 
 FORMS += \

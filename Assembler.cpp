@@ -1,93 +1,140 @@
 #include "Assembler.h"
 
 string Assembler::assemble(string & code, string & message){
-   map<string, size_t> labels;
-   vector<string> lines;
+   map<string, string> labels;
+   vector<vector<string>> lines;
 
    istringstream codeISS(code);
 
-   string line;
-   while(std::getline(codeISS, line)){
-     lines.push_back(line);
+   string currLine;
+   while(getline(codeISS, currLine)){
+
+       //Comment detection
+       size_t commentStart = currLine.find("//");
+       if (commentStart != string::npos) {
+           currLine.erase(commentStart);
+       }
+
+       //getting rid of commas and spacing out starting parentheses and colons
+       replaceAll(currLine, ",", " ");
+
+       size_t charPos = currLine.find('(');
+       if(charPos != string::npos) currLine.replace(charPos, 1, " (");
+
+       charPos = currLine.find(':');
+       if(charPos != string::npos) currLine.replace(charPos, 1, ": ");
+
+       vector<string> vLine;
+       stringSplit(currLine, vLine);
+       lines.push_back(vLine);
+   }
+
+   size_t codeLine = 1;
+
+   //looking for first actual line of code
+   vector<string>* firstCodeLine = nullptr;
+   for(size_t i = 0; i < lines.size(); ++i){
+       if(lines[i].size() != 0) {
+           firstCodeLine = &(lines[i]);
+           break;
+       }
+       ++codeLine;
+   }
+   if(firstCodeLine == nullptr){
+       message = mesAlert + "No code to assemble!" + mesEnd;
+       return "failed";
    }
 
    //getting start address of code
    size_t codeStart;
    string org;
 
-
-   //looking for first actual line of code
-   string firstCodeLine;
-   for(string line : lines){
-       size_t start = line.find_first_not_of(" \t");
-       if(start == line.find("//") || start == string::npos) continue;
-       else{
-           firstCodeLine = line;
-           break;
-       }
+   if((*firstCodeLine)[0] != ".org"){
+      message =  mesError + "code doesn't start with .org pseudo op!" + mesEnd;
+      return "failed";
+   }
+   else if(firstCodeLine->size() != 2){
+       message =  mesError + ".org had incorrect number of parameters on line " + to_string(codeLine) + mesEnd;
+       return "failed";
    }
 
-   if(firstCodeLine.find(".org") == string::npos){
-      message = "code doesn't start with \".org\"!";
-      return "";
+   string strCodeStart = (*firstCodeLine)[1];
+   if(!checkStringNumberic(strCodeStart, true)){
+       message = mesError + ".org has invalid parameter on line " + to_string(codeLine) + mesEnd;
+       return "failed";
    }
 
-   istringstream ss(firstCodeLine);
-   ss >> org >> codeStart;
+   codeStart = stoul(strCodeStart);
 
    //first pass: looking for label positioning
-   size_t instrCounter = 0,
-          codeLine = 1;
+   size_t instrCounter = 0;
+   codeLine = 1;
    for(size_t i = 0; i < lines.size(); ++i){
-      string line = lines[i];
+      vector<string> & line = lines[i];
 
-      size_t start = line.find_first_not_of(" \t");
-      if(line == "" || start == string::npos){
+      if(line.size() == 0 ) continue;
+
+      //checking for .equ used without label
+      if(line[0] == ".equ"){
+          message =  mesError + "incorrect used of .equ on line " + to_string(codeLine) + mesEnd;
+          return "failed";
+      }
+
+      //setting line number based on .org (coincidentally checks for errors in .org's)
+      if (line[0] == ".org"){
+          if(line.size() != 2){
+              message =  mesError + ".org had incorrect number of parameters on line " + to_string(codeLine) + mesEnd;
+              return "failed";
+          }
+
+          if(!checkStringNumberic(line[1], true)){
+              message = mesError + ".org has invalid parameter on line " + to_string(codeLine) + mesEnd;
+              return "failed";
+          }
+
+          instrCounter = stoul(line[1]);
           ++codeLine;
           continue;
       }
 
-	  //Comment detection
-	  size_t commentStart = line.find("//");
-	  if (commentStart != string::npos) {
-		  line.erase(commentStart);
-	  }
-
-	  if (line.find(".org") != string::npos){
-		  istringstream iss(line);
-          iss >> org >> instrCounter;
-          lines[i] = line.substr(start);
-          ++codeLine;
-		  continue;
-	}
-
-      size_t labelEnd = line.find(":");
-      if(labelEnd != string::npos){
-		
-		string label = line.substr(start, labelEnd - start);
-
-        //checking if label is valid
-        if(!checkLabel(label)){
-            message = "Invalid label at line " + to_string(codeLine) + "!";
-            return "";
-        }
-
-		//support for .equ convention
-		size_t equStart = line.find(".equ");
-		if (equStart != string::npos) {
-			istringstream iss(line.substr(equStart + 4));
-			size_t value;
-			iss >> value;
-			labels[label] = value;
-		}
-        else{
-            labels[label] = instrCounter;
-        }
-        start = labelEnd + 1;
+      //looking for proper label
+      string label = "";
+      if(line[0].find(':') == line[0].size()-1) label = line[0].substr(0, line[0].size()-1);
+      else
+      { //if one not found, checking that there is no stray colons
+          for(string seg : line){
+              if(seg.find(':') != string::npos){
+                  message = mesError + "Unexpected ':' on line " + to_string(codeLine) + mesEnd;
+                  return "failed";
+              }
+          }
       }
 
-      //getting rid of leading spaces and labels to make second pass easier
-      lines[i] = line.substr(start);
+      if(!checkLabel(label)){
+          message = mesError + "Invalid label on line " + to_string(codeLine) + "!" + mesEnd;
+          return "failed";
+      }
+
+      if(label != ""){
+          if(line.size() == 1) labels[label] = to_string(instrCounter);
+          //handles .equ and check for numeric value for it
+          else if(line[1] == ".equ"){
+              if(line.size() != 3){
+                  message =  mesError + ".equ had incorrect number of parameters on line " + to_string(codeLine) + mesEnd;
+                  return "failed";
+              }
+              if(!checkStringNumberic(line[2])){
+                  message = mesError + ".equ has invalid parameter on line " + to_string(codeLine) + mesEnd;
+                  return "failed";
+              }
+
+              labels[label] = line[2];
+          }
+          else labels[label] = to_string(instrCounter);
+
+          //getting rid of label from line
+          line.erase(line.begin());
+      }
 
       instrCounter += 4;
       ++codeLine;
@@ -97,67 +144,44 @@ string Assembler::assemble(string & code, string & message){
    string machineCode = "";
    uint32_t lineNum = codeStart;
    codeLine = 1;
-      
-   for(string line : lines){
-      
+
+   for(vector<string> line : lines){
+
       //if the line is empty ignore it
-      if (line == "" || line.find_first_not_of(" \t") == string::npos){
+      if (line.size() == 0){
           ++codeLine;
           continue;
       }
 
-	  //Comment detection
-	  size_t commentStart = line.find("//");
-	  if (commentStart != string::npos) {
-		  line.erase(commentStart);
-          //checking again now if the line is empty
-          if (line == "" || line.find_first_not_of(" \t") == string::npos){
-              ++codeLine;
-              continue;
-          }
-	  }
-
       //searching for labels in current line and replacing them with their value
-	  string label = "";
-	  size_t value, labelPos = string::npos, labelLen = 0;
-      for(map<string, size_t>::iterator it = labels.begin(); it != labels.end(); ++it){
-
-         string newLabel = it->first;
-		 size_t newValue = it->second,
-			 newLabelPos = line.find(newLabel),
-             newLabelLen = newLabel.size();
-
-         if(newLabelPos != string::npos){
-			 if ((newLabelLen > labelLen) || (labelPos == string::npos)) {
-				 label = newLabel;
-				 labelPos = newLabelPos;
-				 labelLen = newLabelLen;
-				 value = newValue;
-			 }
-         }
-      }
-      if(label != ""){
-          line.replace(labelPos, labelLen, to_string(value));
+      for(size_t i = 0; i < line.size(); ++ i){
+          try{
+              string value = labels.at(line[i]);    //throws out_of_range if string line[i] is not a label
+              line[i] = value;
+          }catch(exception OOR){}
       }
 
-      //getting rid of commas
-	   replaceAll(line, ",", " ");
-
-      //getting instruction/pseudo op
-	   istringstream iss(line);
-	   string instr;
-      iss >> instr;
-
+      string instr = line[0];
 
       /**Support for RSRC Assembly Psuedo Operations**/
 
       if (instr == ".org") {    //describes where the next instruction will be stored
-          uint32_t address;
-          iss >> address;
+          if(line.size() != 2){
+              message =  mesError + ".org has incorrect number of parameters on line " + to_string(codeLine) + mesEnd;
+              return "failed";
+          }
+
+          if(!checkStringNumberic(line[1], true)){
+              message = mesError + ".org has invalid parameter on line " + to_string(codeLine) + mesEnd;
+              return "failed";
+          }
+
+          size_t address = stoul(line[1]);
 
           if(address < lineNum || address % 4 != 0){
-              message = ".org address is not valid. Either violates linear ordering or is not word-aligned.";
-              return "";
+              message = mesError + ".org address on line " + to_string(codeLine) +
+                      " is not valid. Either violates linear ordering or is not word-aligned." + mesEnd;
+              return "failed";
           }
 
           if(address == lineNum){
@@ -172,78 +196,110 @@ string Assembler::assemble(string & code, string & message){
 
           ++codeLine;
           continue;
-	  }
+      }
       else if (instr == ".equ") {	//already handled, ignore
           ++codeLine;
-		  continue;
-	  }
+          continue;
+      }
       else if (instr == ".dc") {		//allocate and set 32-bit values
-		  uint32_t value;
-		  while (iss >> value) {
-			  stringstream hexStream;
-			  hexStream << setw(8) << setfill('0') << hex << value;
+          uint32_t word;
+
+          for(size_t i = 1; i < line.size(); ++i){
+              if(!checkStringNumberic(line[i])){
+                  message = mesError + ".dc has a invalid parameter on line " + to_string(codeLine) + mesEnd;
+                  return "failed";
+              }
+
+              word = stoul(line[i]);
+              stringstream hexStream;
+              hexStream << setw(8) << setfill('0') << hex << word;
               machineCode.insert(machineCode.size(), hexStream.str() + "\n");
-			  lineNum += 4;
-		  }
+              lineNum += 4;
+          }
 
           ++codeLine;
-		  continue;
-	  }
+          continue;
+      }
       else if (instr == ".dcb") {	//allocate and set 8 bit values
-		  uint32_t word = 0;
-          size_t value, count = 0;
-		  while (iss >> value) {
+          uint32_t word = 0;
+          uint32_t value, count = 0;
+
+          for(size_t i = 1; i < line.size(); ++i){
+              if(!checkStringNumberic(line[i])){
+                  message = mesError + ".dcb has a invalid parameter on line " + to_string(codeLine) + mesEnd;
+                  return "failed";
+              }
+
+              value = stoul(line[i]);
               word <<= 8;
               word |= value & 0xff;
-			  ++count;
-			  if (count % 4 == 0) {
-				  stringstream hexStream;
-				  hexStream << setw(8) << setfill('0') << hex << word;
+              ++count;
+
+              if (count % 4 == 0) {
+                  stringstream hexStream;
+                  hexStream << setw(8) << setfill('0') << hex << word;
                   machineCode.insert(machineCode.size(), hexStream.str() + "\n");
-				  lineNum += 4;
-				  word = count = 0;
-			  }
-		  }
+                  lineNum += 4;
+                  word = count = 0;
+              }
+          }
 
-		  if (word != 0) {
-			  stringstream hexStream;
-			  hexStream << setw(8) << setfill('0') << hex << word;
-			  machineCode.insert(machineCode.size(), hexStream.str());
-			  lineNum += 4;
-		  }
+          if (word != 0) {
+              stringstream hexStream;
+              hexStream << setw(8) << setfill('0') << hex << word;
+              machineCode.insert(machineCode.size(), hexStream.str());
+              lineNum += 4;
+          }
 
           ++codeLine;
-		  continue;
-	  }
+          continue;
+      }
       else if (instr == ".dch") {	//allocate and set 16 bit values
-		  uint32_t word = 0;
-          size_t value, count = 0;
-		  while (iss >> value) {
-			  word <<= 16;;
-			  word |= value & 0xffff;
-			  ++count;
-			  if (count % 2 == 0) {
-				  stringstream hexStream;
-				  hexStream << setw(8) << setfill('0') << hex << word;
-				  machineCode.insert(machineCode.size(), hexStream.str() + "\n");
-				  lineNum += 4;
-				  word = count = 0;
-			  }
-		  }
+          uint32_t word = 0;
+          uint32_t value, count = 0;
 
-		  if (word != 0) {
-			  stringstream hexStream;
-			  hexStream << setw(8) << setfill('0') << hex << word;
-			  machineCode.insert(machineCode.size(), hexStream.str() + "\n");
-			  lineNum += 4;
-		  }
+          for(size_t i = 1; i < line.size(); ++i){
+              if(!checkStringNumberic(line[i])){
+                  message = mesError + ".dch has a invalid parameter on line " + to_string(codeLine) + mesEnd;
+                  return "failed";
+              }
+
+              value = stoul(line[i]);
+              word <<= 16;
+              word |= value & 0xffff;
+              ++count;
+
+              if (count % 2 == 0) {
+                  stringstream hexStream;
+                  hexStream << setw(8) << setfill('0') << hex << word;
+                  machineCode.insert(machineCode.size(), hexStream.str() + "\n");
+                  lineNum += 4;
+                  word = count = 0;
+              }
+          }
+
+          if (word != 0) {
+              stringstream hexStream;
+              hexStream << setw(8) << setfill('0') << hex << word;
+              machineCode.insert(machineCode.size(), hexStream.str());
+              lineNum += 4;
+          }
 
           ++codeLine;
-		  continue;
+          continue;
       }
       else if (instr == ".dw") {	//allocate 32-bit words
-          size_t count;
-          iss >> count;
+          if(line.size() != 2){
+              message =  mesError + ".dw has incorrect number of parameters on line " + to_string(codeLine) + mesEnd;
+              return "failed";
+          }
+
+          if(!checkStringNumberic(line[1], true)){
+              message = mesError + ".dch has a invalid parameter on line " + to_string(codeLine) + mesEnd;
+              return "failed";
+          }
+
+          size_t count = stoul(line[1]);
           for(size_t i=0; i<count; ++i){
               machineCode.insert(machineCode.size(), "00000000\n");
               lineNum += 4;
@@ -251,7 +307,7 @@ string Assembler::assemble(string & code, string & message){
 
           ++codeLine;
           continue;
-	  }
+      }
 
 
       /**instr doesn't match a psuedo op, meaning check for instructions now**/
@@ -265,311 +321,391 @@ string Assembler::assemble(string & code, string & message){
           in = instructions.at(instr);
           binaryLine = in.opcode;
       }catch(exception e){
-          message = "Invalid instruction or psuedo op at line " +
-                  to_string(codeLine) + "!";
-          return "";
+          message = mesError + "Invalid instruction '" + instr + "' on line " + to_string(codeLine) + "!"  + mesEnd;
+          return "failed";
       }
+
 
 
       /**determining instruction format**/
 
+     //addi, andi, ori, ld, la, st
+     if(in.group == MEM_IMMED){
+        ra = line[1];
 
-      //checking if instr is a shift instruction
-      if(in.group != SHIFT){
-         
-         //can remove r's from register names to get register numbers
-		 replaceAll(line, "r", "");
+        if(instr == "ld" || instr == "st" || instr == "la"){
+            if(line.size() == 3){
+                size_t rbStart = line[2].find('('),
+                       rbEnd = line[2].find(')');
 
-         //greating a new stringstring for newly modified line
-         istringstream iss_m(line);
-         string toss;
-         iss_m >> toss;       //prevent duplicate fetch of instruction
+                if(rbStart == 0 && rbEnd == line[2].size() - 1){
+                    rb = line[2].substr(1, line[2].size() - 2);
+                    c2 = "0";
+                }
+                else if(rbStart == string::npos && rbEnd == string::npos){
+                    c2 = line[2];
+                    rb = "r0";
+                }
+                else{
+                    message = mesError + "Fix parentheses on line " + to_string(codeLine) + "!"  + mesEnd;
+                    return "failed";
+                }
+            }
+            else if(line.size() == 4){
+                c2 = line[2];
 
-         //ld, st, la, addi, andi, ori
-         if(in.group == MEM_IMMED){
-            iss_m >> ra;
+                size_t rbStart = line[3].find('('),
+                       rbEnd = line[3].find(')');
 
-            if(instr == "ld" || instr == "st" || instr == "la"){
-               if (line.find('(') != string::npos) {
-                  string next;
-                  iss_m >> next;
-
-                  size_t rbStart = next.find('('),
-                        rbEnd = next.find(')');
-
-                  rb = next.substr(rbStart + 1, rbEnd - rbStart - 1);
-
-                  if (rbStart == 0) c2 = "0";
-                  else c2 = next.substr(0, rbStart);
-               }
-               else {
-                  rb = "0";
-                  iss_m >> c2;
-               }
+                if(rbStart == 0 && rbEnd == line[3].size() - 1){
+                    rb = line[3].substr(rbStart+1, line[3].size() - 2);
+                }
+                else{
+                    message = mesError + "Fix parentheses on line " + to_string(codeLine) + "!"  + mesEnd;
+                    return "failed";
+                }
             }
             else{
-               iss_m >> rb;
-               iss_m >> c2;
+                message =  mesError + instr + " has incorrect number of parameters on line " + to_string(codeLine) + mesEnd;
+                return "failed";
+            }
+        }
+        else{
+            if(line.size() != 4){
+                message =  mesError + instr + " has incorrect number of parameters on line " + to_string(codeLine) + mesEnd;
+                return "failed";
+            }
+            rb = line[2];
+            c2 = line[3];
+        }
+
+        uint32_t raVal, rbVal, c2Val;
+
+        try{
+            raVal = regMap.at(ra);
+            rbVal = regMap.at(rb);
+        }catch(exception OOF){
+            message = mesError + "Invalid register on line " + to_string(codeLine) + "!" + mesEnd;
+            return "failed";
+        }
+
+        if(!checkStringNumberic(c2)){
+              message = mesError + "Non-numeric constant value on line " + to_string(codeLine) + "!" + mesEnd;
+              return "failed";
+        }
+
+        c2Val = stoul(c2);
+
+        if(!checkConstant(c2Val, C2)){
+              message = mesError + "Invalid c2 constant on line " + to_string(codeLine) + "!" + mesEnd;
+              return "failed";
+        }
+
+        binaryLine <<= 5;
+        binaryLine |= (raVal & REG_MASK);
+
+        binaryLine <<= 5;
+        binaryLine |= (rbVal & REG_MASK);
+
+        binaryLine <<= 17;
+        binaryLine |= (c2Val & C2_MASK);
+     }
+
+     //ldr, str, lar
+     else if(in.group == MEM_REL){
+        if(line.size() != 3){
+            message =  mesError + instr + " has incorrect number of parameters on line " + to_string(codeLine) + mesEnd;
+            return "failed";
+        }
+
+        ra = line[1];
+        c1 = line[2];
+
+        uint32_t raVal, c1Val;
+
+        try{
+            raVal = regMap.at(ra);
+        }catch(exception OOF){
+            message = mesError + "Invalid register on line " + to_string(codeLine) + "!" + mesEnd;
+            return "failed";
+        }
+
+        if(!checkStringNumberic(c1)){
+              message = mesError + "Non-numeric constant value on line " + to_string(codeLine) + "!" + mesEnd;
+              return "failed";
+        }
+
+        c1Val = stoul(c1) - lineNum;
+
+        if(!checkConstant(c1Val, C1)){
+            message = mesError + "Invalid c1 constant on line " + to_string(codeLine) + "!"
+             + mesEnd;
+            return "failed";
+        }
+
+
+        binaryLine <<= 5;
+        binaryLine |= (raVal & REG_MASK);
+
+        binaryLine <<=22;
+        binaryLine |= (c1Val & C1_MASK);
+     }
+
+     //neg, not
+     else if(in.group == NEG){
+        if(line.size() != 3){
+            message =  mesError + instr + " has incorrect number of parameters on line " + to_string(codeLine) + mesEnd;
+            return "failed";
+        }
+
+        uint32_t raVal, rcVal;
+
+        try{
+            raVal = regMap.at(ra);
+            rcVal = regMap.at(rc);
+        }catch(exception OOF){
+            message = mesError + "Invalid register on line " + to_string(codeLine) + "!" + mesEnd;
+            return "failed";
+        }
+
+        binaryLine <<= 5;
+        binaryLine |= (raVal & REG_MASK);
+
+        binaryLine <<= 5;   //rbField unused
+
+        binaryLine <<= 5;
+        binaryLine |= (rcVal & REG_MASK);
+
+        binaryLine <<= 12;
+     }
+
+     //br, brl
+     else if(in.sec_group == BR_ALL){
+        uint32_t con = 0;
+        c3 = "0";
+
+        if(in.group == BRL) ra = line[1];
+        else ra = "r0";
+
+        if(instr == "brlnv" || instr == "brnv"){
+            if(line.size() != 1 && instr == "brnv"){
+                message =  mesError + "brnv has incorrect number of parameters on line " + to_string(codeLine) + mesEnd;
+                return "failed";
+            }
+            if(line.size() != 2 && instr == "brlnv"){
+                message =  mesError + "brlnv has incorrect number of parameters on line " + to_string(codeLine) + mesEnd;
+                return "failed";
             }
 
-            if(!checkStringsNumberic(ra, rb, c2, "0", 0b0010)){
-                  message = "Non-numeric register/constant value at line " + to_string(codeLine) + "!";
-                  return "";
+            rc = rb = "r0";
+        }
+        else if(instr == "br"){
+            if(line.size() == 4){
+                rb = line[1];
+                rc = line[2];
+                c3 = line[3];
             }
-            
-            uint32_t raVal = stoul(ra),
-                     rbVal = stoul(rb),
-                     c2Val = stoul(c2);
-
-            if(!checkRegisterVal(raVal, rbVal)){
-                  message = "Invalid register at line " + to_string(codeLine) + "!";
-                  return "";
-            }
-
-            if(!checkConstant(c2Val, C2)){
-                  message = "Invalid c2 constant at line " + to_string(codeLine) + "!";
-                  return "";
-            }
-
-            binaryLine <<= 5;
-            binaryLine |= (raVal & REG_MASK);
-
-            binaryLine <<= 5;
-            binaryLine |= (rbVal & REG_MASK);
-
-            binaryLine <<= 17;
-            binaryLine |= (c2Val & C2_MASK);
-         }
-
-         //ldr, str, lar
-         else if(in.group == MEM_REL){
-            iss_m >> ra;
-            iss_m >> c1;
-
-            if(!checkStringsNumberic(ra, c1, "0", "0", 0b0100)){
-                  message = "Non-numeric register/constant value at line " + to_string(codeLine) + "!";
-                  return "";
-            }
-            
-            uint32_t raVal = stoul(ra),
-                     c1Val = stoul(c1);
-
-            c1Val -= lineNum;
-
-            if(!checkRegisterVal(raVal)){
-                message = "Invalid register at line " + to_string(codeLine) + "!";
-                return "";
-            }
-
-            if(!checkConstant(c1Val, C1)){
-                message = "Invalid c1 constant at line " + to_string(codeLine) + "!";
-                return "";
-            }
-
-            binaryLine <<= 5;
-            binaryLine |= (raVal & REG_MASK);
-
-            binaryLine <<=22;
-            binaryLine |= (c1Val & C1_MASK);
-         }
-         
-         //neg, not
-         else if(in.group == NEG){
-            iss_m >> ra;
-            iss_m >> rc;
-
-            if(!checkStringsNumberic(ra, rc)){
-                  message = "Non-numeric register/constant value at line " + to_string(codeLine) + "!";
-                  return "";
-            }
-            
-            uint32_t raVal = stoul(ra),
-                     rcVal = stoul(rc);
-
-            if(!checkRegisterVal(raVal, rcVal)){
-                message = "Invalid register at line " + to_string(codeLine) + "!";
-                return "";
-            }
-
-            binaryLine <<= 5;
-            binaryLine |= (raVal & REG_MASK);
-
-            binaryLine <<= 5;   //rbField unused
-
-            binaryLine <<= 5;
-            binaryLine |= (rcVal & REG_MASK);
-
-            binaryLine <<= 12;
-         }
-         
-         //br, brl
-         else if(in.sec_group == BR_ALL){
-            uint32_t con = 0;
-            c3 = "0";
-
-            if(in.group == BRL) iss_m >> ra;
-            else ra = "0";
-
-            if(instr == "brnv" || instr == "brlnv"){
-               rb = rc = "0";
+            else if(line.size() == 2){
+                rb = line[1];
+                rc = "r0";
+                con = 1;
             }
             else{
-               
-               iss_m >> rb;
+                message =  mesError + "br has incorrect number of parameters on line " + to_string(codeLine) + mesEnd;
+                return "failed";
+            }
+        }
+        else if(instr == "brl"){
+            if(line.size() == 5){
+                rb = line[2];
+                rc = line[3];
+                c3 = line[4];
+            }
+            else if(line.size() == 3){
+                rb = line[2];
+                rc = "r0";
+                con = 1;
+            }
+            else{
+                message =  mesError + "brl has incorrect number of parameters on line " + to_string(codeLine) + mesEnd;
+                return "failed";
+            }
+        }
+        else{
+            if(in.group == BR){
+                if(line.size() != 3){
+                    message =  mesError + instr + " has incorrect number of parameters on line " + to_string(codeLine) + mesEnd;
+                    return "failed";
+                }
 
-               if(instr == "br" || instr == "brl"){
-                  if(!(iss_m >> rc)){
-                     rc = "0";
-                     con = 1;
-                  }
-                  else{
-                     iss_m >> c3;
-                  }
-               }
-               else{
-                  
-                  iss_m >> rc;
+                rb = line[1];
+                rc = line[2];
+            }
+            else{
+                if(line.size() != 4){
+                    message =  mesError + instr + " has incorrect number of parameters on line " + to_string(codeLine) + mesEnd;
+                    return "failed";
+                }
 
-                  if(instr == "brzr" || instr == "brlzr")      con = 2;
-                  else if(instr == "brnz" || instr == "brlnz") con = 3;
-                  else if(instr == "brpl" || instr == "brlpl") con = 4;
-                  else con = 5;     //br(l)mi
-               }
+                rb = line[2];
+                rc = line[3];
             }
 
-            if(!checkStringsNumberic(ra, rb, rc, c3, 0b0001)){
-                  message = "Non-numeric register/constant value at line " + to_string(codeLine) + "!";
-                  return "";
-            }
-            
-            uint32_t raVal = stoul(ra),
-                     rbVal = stoul(rb),
-                     rcVal = stoul(rc),
-                     c3Val = stoul(c3);
+            if(instr == "brzr" || instr == "brlzr")      con = 2;
+            else if(instr == "brnz" || instr == "brlnz") con = 3;
+            else if(instr == "brpl" || instr == "brlpl") con = 4;
+            else con = 5;     //br(l)mi
+        }
 
-            if(!checkRegisterVal(raVal, rbVal, rcVal)){
-                message = "Invalid register at line " + to_string(codeLine) + "!";
-                return "";
-            }
 
-            if(!checkConstant(c3Val, C3)){
-                message = "Invalid c3 constant at line " + to_string(codeLine) + "!";
-                return "";
-            }
+        uint32_t raVal, rbVal, rcVal, c3Val;
 
-            binaryLine <<= 5;
-            binaryLine |= (raVal & REG_MASK);
+        try{
+            raVal = regMap.at(ra);
+            rbVal = regMap.at(rb);
+            rcVal = regMap.at(rc);
+        }catch(exception OOF){
+            message = mesError + "Invalid register on line " + to_string(codeLine) + "!" + mesEnd;
+            return "failed";
+        }
 
-            binaryLine <<= 5;
-            binaryLine |= (rbVal & REG_MASK);
+        if(!checkStringNumberic(c3, true)){
+              message = mesError + "Non-numeric constant value on line " + to_string(codeLine) + "!" + mesEnd;
+              return "failed";
+        }
 
-            binaryLine <<= 5;
-            binaryLine |= (rcVal & REG_MASK);
+        c3Val = stoul(c3);
 
-            binaryLine <<= 12;
+        if(!checkConstant(c3Val, C3)){
+            message = mesError + "Invalid c3 constant on line " + to_string(codeLine) + "!" + mesEnd;
+            return "failed";
+        }
 
-            if(con == 0) binaryLine |= (c3Val & C3_MASK);
-            else binaryLine |= (con & 3);
-         }
+        binaryLine <<= 5;
+        binaryLine |= (raVal & REG_MASK);
 
-         //add, sub, and, or
-         else if(in.group == AASO){
-            iss_m >> ra >> rb >> rc;
+        binaryLine <<= 5;
+        binaryLine |= (rbVal & REG_MASK);
 
-            if(!checkStringsNumberic(ra, rb, rc)){
-                  message = "Non-numeric register/constant value at line " + to_string(codeLine) + "!";
-                  return "";
-            }
-            
-            uint32_t raVal = stoul(ra),
-                     rbVal = stoul(rb),
-                     rcVal = stoul(rc);
+        binaryLine <<= 5;
+        binaryLine |= (rcVal & REG_MASK);
 
-            if(!checkRegisterVal(raVal, rbVal, rcVal)){
-                message = "Invalid register at line " + to_string(codeLine) + "!";
-                return "";
-            }
+        binaryLine <<= 12;
 
-            binaryLine <<= 5;
-            binaryLine |= (raVal & REG_MASK);
+        if(con == 0) binaryLine |= (c3Val & C3_MASK);
+        else binaryLine |= (con & 3);
+     }
 
-            binaryLine <<= 5;
-            binaryLine |= (rbVal & REG_MASK);
+     //add, sub, and, or
+     else if(in.group == AASO){
+        if(line.size() != 4){
+            message =  mesError + instr + " has incorrect number of parameters on line " + to_string(codeLine) + mesEnd;
+            return "failed";
+        }
 
-            binaryLine <<= 5;
-            binaryLine |= (rcVal & REG_MASK);
+        ra = line[1];
+        rb = line[2];
+        rc = line[3];
 
-            binaryLine <<= 12;
-         }
-         
-         //nop, stop
-         else{
-            binaryLine <<= 27;
-         }
-      }
+        uint32_t raVal, rbVal, rcVal;
 
-      //shr, shra, shl, shc
-      else {
-         string regA, regB, lastArg;
+        try{
+            raVal = regMap.at(ra);
+            rbVal = regMap.at(rb);
+            rcVal = regMap.at(rc);
+        }catch(exception OOF){
+            message = mesError + "Invalid register on line " + to_string(codeLine) + "!" + mesEnd;
+            return "failed";
+        }
 
-         iss >> ra >> rb >> lastArg;
-         ra.replace(0, 1, "");
-         rb.replace(0, 1, "");
+        binaryLine <<= 5;
+        binaryLine |= (raVal & REG_MASK);
 
-         if(lastArg.find("r") == string::npos){
-            
-            if(!checkStringsNumberic(ra, rb, lastArg)){
-                  message = "Non-numeric register or shift count value at line " + to_string(codeLine) + "!";
-                  return "";
-            }
+        binaryLine <<= 5;
+        binaryLine |= (rbVal & REG_MASK);
 
-            uint32_t raVal = stoul(ra), 
-                     rbVal = stoul(rb),
-                     count = stoul(lastArg);
+        binaryLine <<= 5;
+        binaryLine |= (rcVal & REG_MASK);
 
-            if(!checkRegisterVal(raVal, rbVal, count)){
-                message = "Invalid register or shift count at line " + to_string(codeLine) + "!";
-                return "";
-            }
+        binaryLine <<= 12;
+     }
 
-            binaryLine <<= 5;
-            binaryLine |= (raVal & REG_MASK);
+     //shr, shra, shl, shc
+     else if(in.group == SHIFT){
+        if(line.size() != 4){
+            message =  mesError + instr + " has incorrect number of parameters on line " + to_string(codeLine) + mesEnd;
+            return "failed";
+        }
 
-            binaryLine <<= 5;
-            binaryLine |= (rbVal & REG_MASK);
+        ra = line[1];
+        rb = line[2];
+        string lastArg = line[3];
 
-            binaryLine <<= 17;
-            binaryLine |= (count & REG_MASK);
-         }
-         else{
-            lastArg.replace(0, 1, "");
-            
-            if(!checkStringsNumberic(ra, rb, lastArg)){
-                  message = "Non-numeric register value at line " + to_string(codeLine) + "!";
-                  return "";
-            }
+        if(lastArg.find("r") == string::npos){
 
-            uint32_t raVal = stoul(ra),
-                     rbVal = stoul(rb),
-                     rcVal = stoul(lastArg);
+           if(!checkStringNumberic(lastArg, true)){
+                 message = mesError + "Non-numeric shift count value on line " + to_string(codeLine) + "!" + mesEnd;
+                 return "failed";
+           }
 
-            if(!checkRegisterVal(raVal, rbVal, rcVal)){
-                message = "Invalid register at line " + to_string(codeLine) + "!";
-                return "";
-            }
+           uint32_t raVal, rbVal, count = stoul(lastArg);
 
-            binaryLine <<= 5;
-            binaryLine |= (raVal & REG_MASK);
+           if(count > 31){
+                 message = mesError + "Shift count value too large on line " + to_string(codeLine) + "!" + mesEnd;
+                 return "failed";
+           }
 
-            binaryLine <<= 5;
-            binaryLine |= (rbVal & REG_MASK);
+           try{
+               raVal = regMap.at(ra);
+               rbVal = regMap.at(rb);
+           }catch(exception OOF){
+               message = mesError + "Invalid register on line " + to_string(codeLine) + "!" + mesEnd;
+               return "failed";
+           }
 
-            binaryLine <<= 5;
-            binaryLine |= (rcVal & REG_MASK);
+           binaryLine <<= 5;
+           binaryLine |= (raVal & REG_MASK);
 
-            binaryLine <<= 12;
-         }
-      }
+           binaryLine <<= 5;
+           binaryLine |= (rbVal & REG_MASK);
+
+           binaryLine <<= 17;
+           binaryLine |= (count & REG_MASK);
+        }
+        else{
+           uint32_t raVal, rbVal, rcVal;
+
+           try{
+               raVal = regMap.at(ra);
+               rbVal = regMap.at(rb);
+               rcVal = regMap.at(rc);
+           }catch(exception OOF){
+               message = mesError + "Invalid register on line " + to_string(codeLine) + "!" + mesEnd;
+               return "failed";
+           }
+
+           binaryLine <<= 5;
+           binaryLine |= (raVal & REG_MASK);
+
+           binaryLine <<= 5;
+           binaryLine |= (rbVal & REG_MASK);
+
+           binaryLine <<= 5;
+           binaryLine |= (rcVal & REG_MASK);
+
+           binaryLine <<= 12;
+        }
+     }
+
+     //nop, stop
+     else{
+        if(line.size() != 1){
+            message =  mesError + instr + " has incorrect number of parameters on line " + to_string(codeLine) + mesEnd;
+            return "failed";
+        }
+        binaryLine <<= 27;
+     }
+
 
       stringstream hexStream;
       hexStream << setw(8) << setfill('0') << hex << binaryLine;
@@ -579,67 +715,53 @@ string Assembler::assemble(string & code, string & message){
       lineNum += 4;
       ++codeLine;
    }
+
+
+
+
    return machineCode;
 }
 
 void Assembler::replaceAll(string &in, string tar, string rep) {
-	size_t pos;
-	while ((pos = in.find(tar)) != string::npos) {
-		in.replace(pos, tar.length(), rep);
-	}
+    size_t pos;
+    while ((pos = in.find(tar)) != string::npos) {
+        in.replace(pos, tar.length(), rep);
+    }
 }
 
-bool Assembler::checkRegisterVal(uint32_t reg1, uint32_t reg2,  uint32_t reg3){
-    return !(reg1 > 31 || reg2 > 31 || reg3 > 31);
+void Assembler::stringSplit(string & strLine, vector<string> & vLine){
+    istringstream iss(strLine);
+    string segment;
+    while(iss >> segment) vLine.push_back(segment);
 }
 
-bool Assembler::checkStringsNumberic(string str1, string str2, string str3, string str4, uint8_t constantFlags){
-   bool areValid = true;
-   
-   size_t size1 = str1.size(), size2 = str2.size(), size3 = str3.size(), size4 = str4.size();
-   
-   bool isConst1 = constantFlags & 0b1000,
-        isConst2 = constantFlags & 0b0100,
-        isConst3 = constantFlags & 0b0010,
-        isConst4 = constantFlags & 0b0001;
+bool Assembler::checkStringNumberic(string str, bool isUnsigned){
+   bool isValid = true;
 
-   size_t maxLength = (size1 > size2) ? size1 : size2;
-   maxLength = (maxLength > size3) ?  maxLength : size3;
-   maxLength = (maxLength > size4) ?  maxLength : size4;
+   for(size_t i=0; i < str.size(); ++i){
+      if(str.at(i) == '-' && !isUnsigned) continue;
+      isValid &= isdigit(str.at(i));
 
-   for(size_t i=0; i < maxLength; ++i){
-      if(i < size1){
-         if(isConst1 && str1.at(i) == '-') areValid &= true;
-         else areValid &= isdigit(str1.at(i));
-      }
-      if(i < size2){
-         if(isConst2 && str2.at(i) == '-') areValid &= true;
-         else areValid &= isdigit(str2.at(i));
-      }
-      if(i < size3){
-         if(isConst3 && str3.at(i) == '-') areValid &= true;
-         else areValid &= isdigit(str3.at(i));
-      }
-      if(i < size4){
-         if(isConst4 && str4.at(i) == '-') areValid &= true;
-         else areValid &= isdigit(str4.at(i));
-      }
-
-      if(!areValid) break;
+      if(!isValid) break;
    }
 
-   return areValid;
+   return isValid;
 }
 
 bool Assembler::checkConstant(size_t constVal, CONSTANT_TYPE type){
+    bool isValid = false;
     switch(type){
         case C1:
-            return constVal < (1 << 22);
+            isValid = constVal < (1 << 22);
+            break;
         case C2:
-            return constVal < (1 << 17);
+            isValid = constVal < (1 << 17);
+            break;
         case C3:
-            return constVal < (1 << 12);
+            isValid = constVal < (1 << 12);
+            break;
     }
+    return isValid;
 }
 
 bool Assembler::checkLabel(string label){

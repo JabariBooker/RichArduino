@@ -4,8 +4,9 @@
 
 #include <iostream>
 #include <string>
-#include "FTDI/ftd2xx.h"
 #include <cstdint>
+#include "FTDI/ftd2xx.h"
+#include "MessageFormats.h"
 
 using namespace std;
 
