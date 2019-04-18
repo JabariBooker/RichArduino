@@ -30,10 +30,20 @@ void RichArduino::on_reconnect_clicked() {
     ui->outputField->ensureCursorVisible();
 }
 
+void RichArduino::on_reset_clicked(){
+//    string message;
+//    usb->reset(message);
+
+//    QString mes(message.c_str());
+//    ui->outputField->textCursor().insertHtml(mes);
+//    ui->outputField->ensureCursorVisible();
+}
+
 void RichArduino::on_fileExplore_clicked() {
 	QString filePath = QFileDialog::getOpenFileName(this, tr("Load asm file"), "", tr("asm file (*.asm)"));
 
     if (!filePath.isEmpty()) ui->filePathField->setText(filePath);
+    on_open_clicked();
 }
 
 void RichArduino::on_open_clicked() {
@@ -136,8 +146,7 @@ void RichArduino::on_read_clicked() {
 void RichArduino::on_upload_clicked() {
     QString code = ui->programField->toPlainText();
 	if (!code.isEmpty()) {
-        string text(code.toLatin1().data()),
-               message;
+        string text(code.toLatin1().data()), message;
 
         QString machineCode(assembler.assemble(text, message).c_str());
 
@@ -150,17 +159,25 @@ void RichArduino::on_upload_clicked() {
 
 		QVector<QString> machineWords = machineCode.split('\n').toVector();
 
-        int numWords = machineWords.size() - 2;	//top instruction all 0's and last element will be an empty string
+        int numWords = machineWords.size();
 
 		uint32_t *machineCodeData = new uint32_t[numWords + 1];
 
         machineCodeData[0] = numWords;
-		
-        for (int i = 1; i < numWords + 1; ++i) {
-			uint32_t instr = machineWords.at(i).toULong(nullptr, 16);
 
-			machineCodeData[i] = instr;
+        for (int i = 1; i < numWords + 1; ++i) {
+            QString word = machineWords.at(i-1);
+
+            if(!word.isEmpty()){
+                machineCodeData[i] = word.toULong(nullptr, 16);
+            }
         }
+
+//        cout << numWords + 1 << " lines" << endl;
+
+//        for (int i = 0; i < numWords + 1; ++i) {
+//            cout << setw(8) << setfill('0') << hex << machineCodeData[i] << endl;
+//        }
 
         usb->send(machineCodeData, sizeof(uint32_t) * (numWords + 1), message);
 

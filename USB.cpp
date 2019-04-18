@@ -22,7 +22,7 @@ USB::USB(string & message){
 
       for(size_t i=0; i<numDevs; ++i){
          string des = devInfo[i].Description;
-         if(des == FT201XQ){
+         if(des == BOARD_NAME){
             boardFound = true;
             index = i;
          }
@@ -49,6 +49,45 @@ USB::USB(string & message){
 USB::~USB(){
    FT_Close(handle);
    if(devInfo) delete[] devInfo;
+}
+
+void USB::reset(string & message){
+
+//    message = "done";
+//    UCHAR getMode;
+//    ftStatus = FT_GetBitMode(handle, &getMode);
+//    if(ftStatus == FT_OK){
+//        std::cout << std::hex << (unsigned int)getMode << std::endl;
+//    }
+
+//    //writing reset pin high
+//    UCHAR mask = 0x88;
+//    ftStatus = FT_SetBitMode(handle, mask, 0x20);    //CBUS Bit Bang
+
+//    if(ftStatus != FT_OK){
+//        message = mesAlert + "(1)Unable to reset RichArduino!" + mesEnd;
+//        return;
+//    }
+
+//    //waiting for reset time
+//    Sleep(2000);
+//    cout << "Done high" << endl;
+
+//    //writing reset pin back low
+//    mask = 0x80;
+//    ftStatus = FT_SetBitMode(handle, mask, 0x20);    //CBUS Bit Bang
+
+//    if(ftStatus != FT_OK){
+//        message = mesAlert + "(2)Unable to reset RichArduino!" + mesEnd;
+//        return;
+//    }
+
+//    Sleep(2000);
+//    cout << "Done low" << endl;
+
+//    ftStatus = FT_SetBitMode(handle, 00, 0x20);    //CBUS Bit Bang
+
+//    message = mesSuccess + "RichArduino was reset!" + mesEnd;
 }
 
 void USB::send(void* data, size_t size, string & message){
@@ -133,7 +172,7 @@ bool USB::read(readPt data, int & size, string & message) {
 	}
 
     message = mesSuccess + "Read from RichArduino" + mesEnd;
-	size = bytesRead;
+    size = bytesRead;
 
     return true;
 }

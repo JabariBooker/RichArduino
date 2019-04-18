@@ -16,9 +16,12 @@ class USB{
    public:
       USB(string & message);
       ~USB();
+
       void send(void* data, size_t size, string & message);
 
       bool read(readPt data, int & size, string & message);
+
+      void reset(string & message);
 
 	  bool initialized() { return boardFound;  }
 
@@ -29,7 +32,11 @@ class USB{
       DWORD numDevs;
 
       bool boardFound = false;
+      UCHAR RESET_PIN_MASK = 0b1000;
 
-      const string FT201XQ = "FT201X USB I2C";
+//      const string FT201XQ = "FT201X USB I2C";
+      const string BOARD_NAME = "RichArduino";
       const DWORD txBufferSize = 512, rxBufferSize = 512;
+
+      void toggleReset(string & message);
 };

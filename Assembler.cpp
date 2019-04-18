@@ -458,6 +458,9 @@ string Assembler::assemble(string & code, string & message){
             return "failed";
         }
 
+        ra = line[1];
+        rc = line[2];
+
         uint32_t raVal, rcVal;
 
         try{
@@ -716,8 +719,8 @@ string Assembler::assemble(string & code, string & message){
       ++codeLine;
    }
 
-
-
+   //getting rid of last \n at the end;
+   machineCode = machineCode.substr(0, machineCode.size()-1);
 
    return machineCode;
 }
