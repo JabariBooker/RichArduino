@@ -17,7 +17,7 @@ class USB{
       USB(string & message);
       ~USB();
 
-      void send(void* data, size_t size, string & message);
+      void send(void* data, size_t size, string & message, bool isReset = false);
 
       bool read(readPt data, int & size, string & message);
 

@@ -90,7 +90,7 @@ void USB::reset(string & message){
 //    message = mesSuccess + "RichArduino was reset!" + mesEnd;
 }
 
-void USB::send(void* data, size_t size, string & message){
+void USB::send(void* data, size_t size, string & message, bool isReset){
    
     if (!boardFound) {
         message = mesAlert + "Cannot find RichArduino!" + mesEnd;
@@ -135,7 +135,8 @@ void USB::send(void* data, size_t size, string & message){
 		curr += bytesWritten;
 	}
 
-    message = mesSuccess + "Wrote to USB" + mesEnd;
+    if(isReset) message = mesSuccess + "RichArduino was reset!" + mesEnd;
+    else message = mesSuccess + "Wrote to USB" + mesEnd;
 }
 
 bool USB::read(readPt data, int & size, string & message) {
