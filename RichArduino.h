@@ -6,10 +6,13 @@
 #include <QFile>
 #include <string>
 #include <cstdint>
+#include <thread>
 #include "Assembler.h"
 #include "USB.h"
 #include "MessageFormats.h"
 #include "ui_RichArduino.h"
+
+using namespace std;
 
 class RichArduino : public QWidget
 {
@@ -18,6 +21,8 @@ class RichArduino : public QWidget
 public:
 	RichArduino(QWidget *parent = Q_NULLPTR);
 	~RichArduino();
+
+    friend void autoReconnect(RichArduino &richArduino, USB *usb);
 
 private:
     Ui::RichArduinoClass *ui;

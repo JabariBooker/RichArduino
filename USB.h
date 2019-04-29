@@ -17,13 +17,13 @@ class USB{
       USB(string & message);
       ~USB();
 
-      void send(void* data, size_t size, string & message, bool isReset = false);
+      void send(void* data, size_t size, string & message);
 
       bool read(readPt data, int & size, string & message);
 
       void reset(string & message);
 
-	  bool initialized() { return boardFound;  }
+      bool connected();
 
    private:
       FT_STATUS ftStatus;

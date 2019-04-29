@@ -198,5 +198,6 @@ class Assembler{
       bool checkStringNumberic(string str, bool isUnsigned = false);
       bool checkConstant(size_t constVal, CONSTANT_TYPE type);
       bool checkLabel(string label);
+      uint32_t toVal(string str);
 
 };

@@ -64,7 +64,7 @@ string Assembler::assemble(string & code, string & message){
        return "failed";
    }
 
-   codeStart = stoul(strCodeStart);
+   codeStart = toVal(strCodeStart);
 
    //first pass: looking for label positioning
    size_t instrCounter = 0;
@@ -92,7 +92,7 @@ string Assembler::assemble(string & code, string & message){
               return "failed";
           }
 
-          instrCounter = stoul(line[1]);
+          instrCounter = toVal(line[1]);
           ++codeLine;
           continue;
       }
@@ -176,7 +176,7 @@ string Assembler::assemble(string & code, string & message){
               return "failed";
           }
 
-          size_t address = stoul(line[1]);
+          size_t address = toVal(line[1]);
 
           if(address < lineNum || address % 4 != 0){
               message = mesError + ".org address on line " + to_string(codeLine) +
@@ -210,7 +210,7 @@ string Assembler::assemble(string & code, string & message){
                   return "failed";
               }
 
-              word = stoul(line[i]);
+              word = toVal(line[i]);
               stringstream hexStream;
               hexStream << setw(8) << setfill('0') << hex << word;
               machineCode.insert(machineCode.size(), hexStream.str() + "\n");
@@ -230,7 +230,7 @@ string Assembler::assemble(string & code, string & message){
                   return "failed";
               }
 
-              value = stoul(line[i]);
+              value = toVal(line[i]);
               word <<= 8;
               word |= value & 0xff;
               ++count;
@@ -264,7 +264,7 @@ string Assembler::assemble(string & code, string & message){
                   return "failed";
               }
 
-              value = stoul(line[i]);
+              value = toVal(line[i]);
               word <<= 16;
               word |= value & 0xffff;
               ++count;
@@ -299,7 +299,7 @@ string Assembler::assemble(string & code, string & message){
               return "failed";
           }
 
-          size_t count = stoul(line[1]);
+          size_t count = toVal(line[1]);
           for(size_t i=0; i<count; ++i){
               machineCode.insert(machineCode.size(), "00000000\n");
               lineNum += 4;
@@ -394,7 +394,7 @@ string Assembler::assemble(string & code, string & message){
               return "failed";
         }
 
-        c2Val = stoul(c2);
+        c2Val = toVal(c2);
 
         if(!checkConstant(c2Val, C2)){
               message = mesError + "Invalid c2 constant on line " + to_string(codeLine) + "!" + mesEnd;
@@ -435,7 +435,7 @@ string Assembler::assemble(string & code, string & message){
               return "failed";
         }
 
-        c1Val = stoul(c1) - lineNum;
+        c1Val = toVal(c1) - lineNum;
 
         if(!checkConstant(c1Val, C1)){
             message = mesError + "Invalid c1 constant on line " + to_string(codeLine) + "!"
@@ -577,7 +577,7 @@ string Assembler::assemble(string & code, string & message){
               return "failed";
         }
 
-        c3Val = stoul(c3);
+        c3Val = toVal(c3);
 
         if(!checkConstant(c3Val, C3)){
             message = mesError + "Invalid c3 constant on line " + to_string(codeLine) + "!" + mesEnd;
@@ -651,7 +651,7 @@ string Assembler::assemble(string & code, string & message){
                  return "failed";
            }
 
-           uint32_t raVal, rbVal, count = stoul(lastArg);
+           uint32_t raVal, rbVal, count = toVal(lastArg);
 
            if(count > 31){
                  message = mesError + "Shift count value too large on line " + to_string(codeLine) + "!" + mesEnd;
@@ -740,10 +740,18 @@ void Assembler::stringSplit(string & strLine, vector<string> & vLine){
 
 bool Assembler::checkStringNumberic(string str, bool isUnsigned){
    bool isValid = true;
+   bool hitHex = false;
 
    for(size_t i=0; i < str.size(); ++i){
       if(str.at(i) == '-' && !isUnsigned) continue;
-      isValid &= isdigit(str.at(i));
+
+      bool hexFound = false;
+      if(i > 0) hexFound = (str.at(i) == 'x') && (str.at(i-1) == '0');
+
+      isValid &= isdigit(str.at(i)) || hexFound;
+
+      if(hexFound && !hitHex) hitHex = true;
+      else if(hexFound && hitHex) isValid = false;
 
       if(!isValid) break;
    }
@@ -783,4 +791,8 @@ bool Assembler::checkLabel(string label){
     }
 
     return isValid;
+}
+
+uint32_t Assembler::toVal(string str){
+    return (str.find("0x") == string::npos) ? stoul(str) : stoul(str, nullptr, 16);
 }

@@ -31,18 +31,8 @@ void RichArduino::on_reconnect_clicked() {
 }
 
 void RichArduino::on_reset_clicked(){
-//    string message;
-//    usb->reset(message);
-
-//    QString mes(message.c_str());
-//    ui->outputField->textCursor().insertHtml(mes);
-//    ui->outputField->ensureCursorVisible();
-
     string message;
-
-    uint32_t resetSignal = 0xf8000000;
-
-    usb->send(&resetSignal, sizeof(uint32_t), message, true);
+    usb->reset(message);
 
     QString mes(message.c_str());
     ui->outputField->textCursor().insertHtml(mes);
