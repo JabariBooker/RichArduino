@@ -61,7 +61,7 @@
     </rect>
    </property>
    <property name="toolTip">
-    <string>Save current assembly code to .asm</string>
+    <string>Save changes to current assembly code</string>
    </property>
    <property name="text">
     <string>Save .asm</string>
@@ -239,6 +239,22 @@
    </property>
    <property name="text">
     <string>Reset</string>
+   </property>
+  </widget>
+  <widget class="QPushButton" name="saveAsmAs">
+   <property name="geometry">
+    <rect>
+     <x>200</x>
+     <y>40</y>
+     <width>81</width>
+     <height>23</height>
+    </rect>
+   </property>
+   <property name="toolTip">
+    <string>Save current assembly code to .asm</string>
+   </property>
+   <property name="text">
+    <string>Save As .asm</string>
    </property>
   </widget>
  </widget>

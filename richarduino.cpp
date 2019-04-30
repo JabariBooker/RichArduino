@@ -48,6 +48,7 @@ void RichArduino::on_fileExplore_clicked() {
 
 void RichArduino::on_open_clicked() {
     QString filePath = ui->filePathField->displayText();
+    openFile = filePath;
 
     if (!filePath.isEmpty()) {
 
@@ -67,7 +68,26 @@ void RichArduino::on_open_clicked() {
 }
 
 void RichArduino::on_saveAsm_clicked() {
+
+    if (!openFile.isEmpty()) {
+        QFile outFile(openFile);
+
+        if (outFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
+            QTextStream out(&outFile);
+            out << (ui->programField->toPlainText());
+            QString message = qMesSuccess + "Saved assembly code to: " + openFile + qMesEnd;
+            ui->outputField->textCursor().insertHtml(message);
+            ui->outputField->ensureCursorVisible();
+        }
+
+    }
+    else on_saveAsmAs_clicked();
+}
+
+void RichArduino::on_saveAsmAs_clicked() {
+
     QString filePath = QFileDialog::getSaveFileName(this, tr("Save asm file"), "", tr("asm file (*.asm)"));
+    openFile = filePath;
 
     if (!filePath.isEmpty()) {
         QFile outFile(filePath);
@@ -144,6 +164,12 @@ void RichArduino::on_read_clicked() {
 }
 
 void RichArduino::on_upload_clicked() {
+
+    //saving changes to file
+    if(openFile.isEmpty()) on_saveAsmAs_clicked();
+    else on_saveAsm_clicked();
+
+    //assembling and uploading code to RichArduino
     QString code = ui->programField->toPlainText();
     if (!code.isEmpty()) {
         string text(code.toLatin1().data()), message;
@@ -161,6 +187,11 @@ void RichArduino::on_upload_clicked() {
 
         int numWords = machineWords.size();
 
+        if(numWords > 1024 - 1){
+            ui->outputField->textCursor().insertHtml(qMesError + "Code is to large to SRAM of RichArduino!" + qMesEnd);
+            return;
+        }
+
         uint32_t *machineCodeData = new uint32_t[numWords + 1];
 
         machineCodeData[0] = numWords;
@@ -173,10 +204,17 @@ void RichArduino::on_upload_clicked() {
             }
         }
 
+//        cout << "Header: " << machineCodeData[0] << endl;
+
 //        cout << numWords + 1 << " lines" << endl;
 
 //        for (int i = 0; i < numWords + 1; ++i) {
 //            cout << setw(8) << setfill('0') << hex << machineCodeData[i] << endl;
+//        }
+
+//        uint32_t word = 0xf8000000;
+//        for(int i=0; i <992; ++i){
+//            usb->send(&word, sizeof(uint32_t), message);
 //        }
 
         usb->send(machineCodeData, sizeof(uint32_t) * (numWords + 1), message);

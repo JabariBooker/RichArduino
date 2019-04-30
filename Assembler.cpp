@@ -596,7 +596,7 @@ string Assembler::assemble(string & code, string & message){
         binaryLine <<= 12;
 
         if(con == 0) binaryLine |= (c3Val & C3_MASK);
-        else binaryLine |= (con & 3);
+        else binaryLine |= (con & 7);
      }
 
      //add, sub, and, or

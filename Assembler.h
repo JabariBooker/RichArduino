@@ -8,6 +8,7 @@
 #include <vector>
 #include <cstdint>
 #include "MessageFormats.h"
+#include <iostream>
 
 using namespace std;
 

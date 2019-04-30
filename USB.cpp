@@ -105,17 +105,29 @@ void USB::send(void* data, size_t size, string & message){
 			bytesToWrite,
 			bytesWritten;
 
+    size_t attempts = 0;
+
 	while(curr != end){
+        ++attempts;
 		ftStatus = FT_GetStatus(handle, &rxBufferAmount, &txBufferAmount, &eventStatus);
 		if(ftStatus != FT_OK){
             message = mesAlert + "Unable to check status of RichArduino!" + mesEnd;
 			return;
-		}
-//        else{
-//            cout << "txBuffer: " << txBufferAmount << endl;
-//        }
-      
-        bytesToWrite = 4;//txBufferSize - txBufferAmount;
+        }
+
+        if(txBufferAmount == txBufferSize){
+            ++attempts;
+
+            if(attempts >= 1000){
+                message = mesAlert + "Send timed-out, failed to write all data!" + mesEnd;
+                return;
+            }
+            continue;
+        }
+        else attempts = 0;
+
+
+        bytesToWrite = txBufferSize - txBufferAmount;
 
 		if(bytesToWrite > size){
 			bytesToWrite = size;
@@ -134,9 +146,10 @@ void USB::send(void* data, size_t size, string & message){
 			return;
 		}
 
-		curr += bytesWritten;
-//        Sleep(100);
+        curr += bytesWritten;
 	}
+
+    cout << "sent stop" << endl;
 
     message = mesSuccess + "Wrote to USB" + mesEnd;
 }
