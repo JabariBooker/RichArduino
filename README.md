@@ -3,16 +3,16 @@ The RichArduino is a FPGA-based alternative to the Arduino platform. The Arduino
 
 The RichArduino replaces the Atmel 8-bit AVR microcontroller found on most Arduino boards with an FPGA. This FPGA is connected to a USB port, an HDMI port, and digital I/O pins. The RichArduino platform is designed to allow developers to program the FPGA with a microcontroller description that can drive and respond to these ports and pins.
 
-Developed by:
+**Developed by:**
 
-Nathan Jarvis, undergraduate at Washington University in. St Louis
+* _Nathan Jarvis_, undergraduate at Washington University in. St Louis
 
-Jackson Hyde, undergraduate at Washington University in. St Louis
+* _Jackson Hyde_, undergraduate at Washington University in. St Louis
 
-Dean Choi, undergraduate at Washington University in. St Louis
+* _Dean Choi_, undergraduate at Washington University in. St Louis
 
-Jabari Booker, undergraduate at Washington University in. St Louis
+* _Jabari Booker_, undergraduate at Washington University in. St Louis
 
-Supervised by:
+**Supervised by:**
 
-Dr. William D. Richard, Associate Professor of Computer Engineering at Washington University in. St Louis
+* _Dr. William D. Richard_, Associate Professor of Computer Engineering at Washington University in. St Louis
