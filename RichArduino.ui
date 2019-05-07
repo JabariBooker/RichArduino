@@ -67,22 +67,6 @@
     <string>Save .asm</string>
    </property>
   </widget>
-  <widget class="QPushButton" name="read">
-   <property name="geometry">
-    <rect>
-     <x>540</x>
-     <y>640</y>
-     <width>71</width>
-     <height>23</height>
-    </rect>
-   </property>
-   <property name="toolTip">
-    <string>Read in data from RichArduino</string>
-   </property>
-   <property name="text">
-    <string>Read</string>
-   </property>
-  </widget>
   <widget class="QPushButton" name="fileExplore">
    <property name="geometry">
     <rect>
@@ -156,7 +140,7 @@
     <rect>
      <x>10</x>
      <y>640</y>
-     <width>521</width>
+     <width>601</width>
      <height>81</height>
     </rect>
    </property>

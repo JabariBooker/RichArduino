@@ -149,51 +149,5 @@ void USB::send(void* data, size_t size, string & message){
         curr += bytesWritten;
 	}
 
-    cout << "sent stop" << endl;
-
     message = mesSuccess + "Wrote to USB" + mesEnd;
-}
-
-bool USB::read(readPt data, int & size, string & message) {
-
-    if (!connected()) {
-        message = mesAlert + "Not connected to RichArduino!" + mesEnd;
-        return false;
-    }
-
-    if(data != nullptr){
-        delete[] data;
-	}
-
-	DWORD txBufferAmount,
-		rxBufferAmount,
-		eventStatus,
-		bytesRead;
-
-	ftStatus = FT_GetStatus(handle, &rxBufferAmount, &txBufferAmount, &eventStatus);
-	if (ftStatus != FT_OK) {
-        message = mesAlert + "Unable to check status of FT201XQ!" + mesEnd;
-        return false;
-	}
-
-	data = new uint8_t[rxBufferAmount];
-
-	size = -1;
-
-	ftStatus = FT_Read(handle, data, rxBufferAmount, &bytesRead);
-	if (ftStatus != FT_OK) {
-        message = mesAlert + "Unable to read from USB!" + mesEnd;
-        delete[] data;
-        return false;
-	}
-	if (bytesRead != rxBufferAmount) {
-        message = mesAlert + "Did not read all data from USB!" + mesEnd;
-        delete[] data;
-        return false;
-	}
-
-    message = mesSuccess + "Read from RichArduino" + mesEnd;
-    size = bytesRead;
-
-    return true;
 }

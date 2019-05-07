@@ -46,6 +46,8 @@ qnx: target.path = /tmp/$${TARGET}/bin
 else: unix:!android: target.path = /opt/$${TARGET}/bin
 !isEmpty(target.path): INSTALLS += target
 
+win32: RC_ICONS += RichArduinoIcon.ico
+
 win32: LIBS += -L$$PWD/FTDI/i386/ -lftd2xx
 
 INCLUDEPATH += $$PWD/FTDI/i386
@@ -59,3 +61,6 @@ INCLUDEPATH += $$PWD/'FTDI Mac/D2XX'
 DEPENDPATH += $$PWD/'FTDI Mac/D2XX'
 
 macx: PRE_TARGETDEPS += $$PWD/'FTDI Mac/D2XX/libftd2xx.a'
+
+DISTFILES += \
+    RichArduinoIcon.ico

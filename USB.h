@@ -19,8 +19,6 @@ class USB{
 
       void send(void* data, size_t size, string & message);
 
-      bool read(readPt data, int & size, string & message);
-
       void reset(string & message);
 
       bool connected();

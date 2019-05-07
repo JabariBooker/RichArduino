@@ -38,7 +38,6 @@ private slots:
     void on_saveAsm_clicked();		//save changes to asm code
     void on_saveAsmAs_clicked();    //save asm code to file
     void on_saveBin_clicked();      //save machine code to file
-	void on_read_clicked();			//assemble code and show in output
 	void on_upload_clicked();		//sends assembled code over USB
     void on_reset_clicked();        //reset RichArduino
 };

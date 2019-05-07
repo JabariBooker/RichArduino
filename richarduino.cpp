@@ -31,6 +31,8 @@ void RichArduino::on_reconnect_clicked() {
 }
 
 void RichArduino::on_reset_clicked(){
+    ui->outputField->textCursor().insertHtml(qMesNormal + "Starting reset!" + qMesEnd);
+
     string message;
     usb->reset(message);
 
@@ -132,37 +134,6 @@ void RichArduino::on_saveBin_clicked(){
     }
 }
 
-void RichArduino::on_read_clicked() {
-    readPt in = nullptr;
-    int bytes;
-
-    string message;
-
-    bool success = usb->read(in, bytes, message);
-
-    QString mes(message.c_str());
-    ui->outputField->textCursor().insertHtml(mes);
-
-    if (success) {
-        if (bytes != -1) {
-            uint8_t* data = (uint8_t*)in;
-
-            QString output = "";
-
-            for (int i = 0; i < bytes; ++i) {
-                output.append(QString::number(*(data + i), 16));
-                QString end = (i % 4 == 0) ? "\n" : " ";
-                output.append(end);
-            }
-
-            output = qMesNormal + output + qMesEnd;
-            ui->outputField->textCursor().insertHtml(output);
-            ui->outputField->ensureCursorVisible();
-        }
-        delete[] in;
-    }
-}
-
 void RichArduino::on_upload_clicked() {
 
     //saving changes to file
@@ -203,19 +174,6 @@ void RichArduino::on_upload_clicked() {
                 machineCodeData[i] = word.toULong(nullptr, 16);
             }
         }
-
-//        cout << "Header: " << machineCodeData[0] << endl;
-
-//        cout << numWords + 1 << " lines" << endl;
-
-//        for (int i = 0; i < numWords + 1; ++i) {
-//            cout << setw(8) << setfill('0') << hex << machineCodeData[i] << endl;
-//        }
-
-//        uint32_t word = 0xf8000000;
-//        for(int i=0; i <992; ++i){
-//            usb->send(&word, sizeof(uint32_t), message);
-//        }
 
         usb->send(machineCodeData, sizeof(uint32_t) * (numWords + 1), message);
 
